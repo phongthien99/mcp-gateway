@@ -2,6 +2,8 @@ package module
 
 import (
 	"mcp-gateway/src/config"
+	"mcp-gateway/src/prompts"
+	"mcp-gateway/src/resources"
 	"mcp-gateway/src/tools"
 
 	"github.com/gestgo/gest/package/extension/mcp"
@@ -14,9 +16,14 @@ func NewApp() *fx.App {
 
 	opts := []fx.Option{
 		fx.Provide(
-			mcp.AsHandler(tools.NewFileSystemTools),
-			mcp.AsHandler(tools.NewSystemTools),
-			mcp.AsHandler(tools.NewHTTPTools),
+			// Tools — actions Claude can invoke
+			mcp.AsHandler(tools.NewArtifactTools),
+
+			// Resources — data Claude can read by URI
+			mcp.AsHandler(resources.NewArtifactResources),
+
+			// Prompts — structured prompt templates Claude can retrieve
+			mcp.AsHandler(prompts.NewWorkflowPrompts),
 		),
 
 		fx.Supply(cfg.MCP),

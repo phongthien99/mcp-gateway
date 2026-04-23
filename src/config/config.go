@@ -17,7 +17,7 @@ func Load() AppConfig {
 		transport = mcp.TransportStdio
 	}
 
-	port := 8080
+	port := 8099
 	if p := os.Getenv("MCP_PORT"); p != "" {
 		if v, err := strconv.Atoi(p); err == nil {
 			port = v
