@@ -1,0 +1,14 @@
+id: init-project
+name: Initialise Project Context
+
+steps:
+  - id: init
+    prompt_file: init_project.md
+    description: "Solution Architect: tạo context directory và ghi architecture, coding-standards, compliance-rules"
+    extra_args:
+      - name: description
+        description: Mô tả project (stack, domain, quy tắc đặc thù)
+        required: true
+    reads: []
+    context: []
+    writes: ""
