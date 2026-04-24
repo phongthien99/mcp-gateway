@@ -18,6 +18,7 @@ func NewApp() *fx.App {
 		fx.Provide(
 			// Tools — actions Claude can invoke
 			mcp.AsHandler(tools.NewArtifactTools),
+			mcp.AsHandler(tools.NewContextTools),
 
 			// Resources — data Claude can read by URI
 			mcp.AsHandler(resources.NewArtifactResources),

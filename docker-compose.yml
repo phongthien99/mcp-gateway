@@ -1,0 +1,28 @@
+services:
+  mcp-gateway:
+    build: .
+    ports:
+      - "${MCP_PORT:-8099}:8099"
+    environment:
+      MCP_TRANSPORT: sse          # stdio không dùng được trong Docker
+      MCP_PORT: 8099
+      MCP_NAME: ${MCP_NAME:-mcp-gateway}
+      MCP_VERSION: ${MCP_VERSION:-1.0.0}
+    volumes:
+      # User-editable — mount trực tiếp để sửa mà không cần rebuild
+      - ./workflows:/app/workflows
+      - ./prompts:/app/prompts
+      - ./context:/app/context
+      - ./runs:/app/runs
+      # Artifacts — persistent volume để giữ kết quả giữa các lần chạy
+      - artifacts:/app/artifacts
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8099/sse"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+volumes:
+  artifacts:
