@@ -5,9 +5,11 @@
 Hệ thống hoạt động theo nguyên tắc: **YAML định nghĩa luồng, Markdown chứa nội dung**.
 
 ```
-workflows/my-workflow.yaml   ← định nghĩa các bước, thứ tự, artifact nào đọc/ghi
-prompts/my-step.md           ← nội dung prompt gửi cho Claude ở bước đó
-artifacts/{project}/{feature}/ ← nơi lưu kết quả từng bước
+workflows/my-workflow.yaml      ← định nghĩa các bước, thứ tự, artifact và context nào dùng
+prompts/my-step.md              ← nội dung prompt gửi cho Claude ở bước đó
+artifacts/{project}/{feature}/  ← kết quả sinh ra bởi từng bước (do Claude viết)
+context/global/                 ← tài liệu tham chiếu dùng chung (architecture, compliance...)
+context/{project_id}/           ← tài liệu tham chiếu riêng cho từng project
 ```
 
 Thêm workflow hoặc step mới **không cần sửa code Go**, chỉ cần tạo file YAML và `.md`.
@@ -55,7 +57,7 @@ steps:
     writes: tasks
 ```
 
-**`extra_args` chỉ dùng cho tham số người dùng nhập vào.** Các artifact trong `reads` được load tự động — không cần khai báo thành `extra_args`.
+**`extra_args` chỉ dùng cho tham số người dùng nhập vào.** Các artifact trong `reads` và tài liệu trong `context` được load tự động — không cần khai báo thành `extra_args`.
 
 **`id` của step chính là tên prompt MCP.** Claude Code sẽ thấy prompt với tên này.
 
@@ -227,7 +229,62 @@ Sau khi viết xong, gọi tool **write_artifact** với:
 
 ---
 
-## 3. Artifact
+## 3. Context (Tài liệu tham chiếu)
+
+Context là tài liệu do con người viết sẵn — kiến trúc, coding standards, compliance rules — được inject vào prompt của các step cần đến.
+
+### Khác nhau giữa `reads` và `context`
+
+| | `reads` | `context` |
+|---|---|---|
+| Nguồn gốc | Claude sinh ra khi chạy step | Con người viết sẵn |
+| Vị trí | `artifacts/{project}/{feature}/` | `context/{project}/` hoặc `context/global/` |
+| Thay đổi | Mỗi lần chạy | Ổn định, ít thay đổi |
+| Ví dụ | `discovery`, `spec`, `plan` | `architecture`, `compliance-rules` |
+
+### Cấu trúc thư mục
+
+```
+context/
+  global/                     ← áp dụng cho mọi project
+    architecture.md
+    coding-standards.md
+    compliance-rules.md
+  {project_id}/               ← override global cho project cụ thể
+    compliance-rules.md       ← project này có compliance riêng
+```
+
+**Quy tắc load:** `context/{project_id}/{name}.md` được ưu tiên, nếu không có thì fallback sang `context/global/{name}.md`.
+
+### Khai báo trong YAML
+
+```yaml
+steps:
+  - id: plan
+    reads: [spec]
+    context: [architecture, coding-standards, compliance-rules]
+    writes: plan
+```
+
+### Dùng trong prompt `.md`
+
+```markdown
+**Architecture Guidelines:**
+
+{{architecture}}
+
+---
+
+**Compliance Rules:**
+
+{{compliance-rules}}
+```
+
+Tên placeholder phải khớp chính xác với tên trong `context:` (không có `.md`).
+
+---
+
+## 4. Artifact
 
 Artifact được lưu tự động tại:
 
@@ -254,16 +311,21 @@ resource://artifact/my-app/export-task-csv/spec
 
 ---
 
-## 4. Thêm workflow mới — checklist
+## 5. Thêm workflow mới — checklist
 
 ```
 [ ] Tạo workflows/ten-workflow.yaml
       - Đặt id duy nhất
       - Định nghĩa steps theo thứ tự
       - Đảm bảo reads/writes khớp nhau giữa các step
+      - Khai báo context: nếu step cần tài liệu tham chiếu
+
+[ ] Tạo/kiểm tra context docs nếu dùng context:
+      - context/global/{name}.md   ← dùng chung
+      - context/{project_id}/{name}.md  ← override cho project cụ thể
 
 [ ] Tạo prompts/{ten-step}.md cho mỗi step
-      - Dùng đúng placeholder tương ứng với reads và extra_args
+      - Dùng đúng placeholder cho reads, context, và extra_args
       - Luôn có hướng dẫn gọi write_artifact ở cuối
       - Ghi đúng path: "{{project_id}}/{{feature_id}}/{writes}"
 
@@ -273,11 +335,12 @@ resource://artifact/my-app/export-task-csv/spec
 
 ---
 
-## 5. Lỗi thường gặp
+## 6. Lỗi thường gặp
 
 | Lỗi | Nguyên nhân | Cách fix |
 |---|---|---|
 | `artifact "X" not found` | Step trước chưa chạy hoặc `writes` sai tên | Chạy đúng thứ tự step, kiểm tra `writes` trong YAML |
+| `context "X" not found` | File context chưa tồn tại ở cả project lẫn global | Tạo `context/global/{name}.md` hoặc `context/{project_id}/{name}.md` |
 | `prompt file "X" not found` | `prompt_file` trỏ sai tên file | Kiểm tra tên file trong `prompts/` |
-| Placeholder không được replace | Sai tên placeholder | Tên trong `.md` phải khớp `reads`/`extra_args` trong YAML |
+| Placeholder không được replace | Sai tên placeholder | Tên trong `.md` phải khớp `reads`/`context`/`extra_args` trong YAML |
 | Claude ghi sai đường dẫn | `write_artifact path` trong `.md` thiếu `{{project_id}}` | Path phải là `"{{project_id}}/{{feature_id}}/{writes}"` |

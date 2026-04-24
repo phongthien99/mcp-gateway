@@ -9,32 +9,17 @@ import (
 )
 
 func main() {
-	workflowPath := "workflows/export-task-csv.yaml"
-	projectID := "demo-project"
-	featureID := "export-task-csv"
-
+	runConfig := "runs/export-task-csv.yaml"
 	if len(os.Args) > 1 {
-		workflowPath = os.Args[1]
-	}
-	if len(os.Args) > 2 {
-		projectID = os.Args[2]
-	}
-	if len(os.Args) > 3 {
-		featureID = os.Args[3]
+		runConfig = os.Args[1]
 	}
 
-	runner, err := workflow.NewRunner(workflowPath, projectID, featureID)
+	runner, err := workflow.NewRunner(runConfig)
 	if err != nil {
 		log.Fatalf("init: %v", err)
 	}
 
-	extraArgs := map[string]string{
-		"project_id": projectID,
-		"feature_id": featureID,
-		"request":    "Tôi muốn thêm chức năng export danh sách task ra file CSV. Người dùng bấm nút Export để tải file về. CSV gồm: title, status, assignee, due_date.",
-	}
-
-	if err := runner.Run(extraArgs); err != nil {
+	if err := runner.Run(); err != nil {
 		log.Fatalf("run: %v", err)
 	}
 

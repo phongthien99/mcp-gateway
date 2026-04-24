@@ -1,0 +1,9 @@
+workflow: workflows/export-task-csv.yaml
+project_id: my-app
+feature_id: export-task-csv
+args:
+  request: >
+    Tôi muốn thêm chức năng export danh sách task ra file CSV.
+    Người dùng bấm nút Export để tải file về.
+    CSV gồm: title, status, assignee, due_date.
+    Chưa cần filter nâng cao.

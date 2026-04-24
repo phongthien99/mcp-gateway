@@ -16,6 +16,7 @@ import (
 
 const artifactsRoot = "artifacts"
 const promptsRoot = "prompts"
+const contextRoot = "context"
 const workflowsDir = "workflows"
 
 // WorkflowPrompts scans workflows/*.yaml at startup and dynamically registers
@@ -73,9 +74,6 @@ func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) 
 	}
 }
 
-// buildHandler returns a generic prompt handler driven entirely by the step config.
-// It reads artifacts listed in step.Reads, renders the prompt_file template,
-// and returns the result as a user message.
 func (w *WorkflowPrompts) buildHandler(step workflow.Step) mcpserver.PromptHandlerFunc {
 	return func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		args := req.Params.Arguments
@@ -92,9 +90,18 @@ func (w *WorkflowPrompts) buildHandler(step workflow.Step) mcpserver.PromptHandl
 			vars[arg.Name] = args[arg.Name]
 		}
 
-		// Load each artifact listed in reads → becomes {{artifact_name}} in template.
+		// Load generated artifacts from previous steps.
 		for _, name := range step.Reads {
 			content, err := w.readArtifact(projectID, featureID, name)
+			if err != nil {
+				return nil, err
+			}
+			vars[name] = content
+		}
+
+		// Load reference/context docs: project-scoped first, fallback to global.
+		for _, name := range step.Context {
+			content, err := w.readContext(projectID, name)
 			if err != nil {
 				return nil, err
 			}
@@ -138,4 +145,22 @@ func (w *WorkflowPrompts) readArtifact(projectID, featureID, name string) (strin
 			name, projectID, featureID)
 	}
 	return string(data), nil
+}
+
+// readContext loads a reference doc, preferring project-scoped over global.
+//
+//	context/{project_id}/{name}.md  →  project-specific version
+//	context/global/{name}.md        →  fallback shared version
+func (w *WorkflowPrompts) readContext(projectID, name string) (string, error) {
+	projectPath := filepath.Join(contextRoot, projectID, name+".md")
+	if data, err := os.ReadFile(projectPath); err == nil {
+		return string(data), nil
+	}
+
+	globalPath := filepath.Join(contextRoot, "global", name+".md")
+	if data, err := os.ReadFile(globalPath); err == nil {
+		return string(data), nil
+	}
+
+	return "", fmt.Errorf("context %q not found at %s or %s", name, projectPath, globalPath)
 }
