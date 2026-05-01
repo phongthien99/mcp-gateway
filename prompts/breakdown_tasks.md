@@ -9,11 +9,19 @@ Yêu cầu:
 - Bao gồm task cho testing, tuân theo coding standards (coverage tối thiểu 80%)
 - Ghi rõ task nào cần chú ý compliance
 
-Đầu ra markdown bảng với các cột:
-Task ID | Title | Description | Depends on | Output
+Đầu ra là markdown theo quy tắc:
+- Có front matter `title` và `weight`
+- Có đúng một H1
+- Có mục Purpose ngắn
+- Có bảng task với các cột:
+  Task ID | Title | Description | Depends on | Output
+
+Áp dụng rule chung:
+
+{{markdown_rules}}
 
 Sau khi viết xong, gọi tool **write_artifact** với:
-- path = "{{project_id}}/{{feature_id}}/tasks"
+- path = "{{project_id}}/{{feature_id}}/tasks.md"
 - content = nội dung markdown bạn vừa viết
 
 ---

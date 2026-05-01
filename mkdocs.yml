@@ -1,0 +1,21 @@
+site_name: MCP Gateway Docs
+theme:
+  name: material
+  language: vi
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.indexes
+    - search.highlight
+    - content.action.edit
+
+plugins:
+  - search
+  - awesome-pages
+
+nav:
+  - Tổng quan: index.md
+  - Hướng dẫn Workflow: workflow-guide.md
+  - Blog: blog.md
+  - Projects: context/
+  - Artifacts: artifacts/

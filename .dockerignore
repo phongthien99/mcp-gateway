@@ -3,3 +3,5 @@
 artifacts/
 *.exe
 *.test
+apps/hugo-book-site/public/
+apps/hugo-book-site/resources/
