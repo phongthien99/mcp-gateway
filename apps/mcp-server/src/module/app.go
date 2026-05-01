@@ -1,6 +1,7 @@
 package module
 
 import (
+	"mcp-gateway/src/api"
 	"mcp-gateway/src/config"
 	"mcp-gateway/src/prompts"
 	"mcp-gateway/src/resources"
@@ -25,13 +26,19 @@ func NewApp() *fx.App {
 
 			// Prompts — structured prompt templates Claude can retrieve
 			mcp.AsHandler(prompts.NewWorkflowPrompts),
+
+			api.NewFileServer,
 		),
 
 		fx.Supply(cfg.MCP),
+		fx.Supply(cfg),
 
 		mcp.Module(),
 
-		fx.Invoke(func(*mcpserver.MCPServer) {}),
+		fx.Invoke(
+			func(*mcpserver.MCPServer) {},
+			api.RegisterFileServer,
+		),
 	}
 
 	// Stdio transport writes to stdout — suppress all Fx logs to avoid protocol corruption.

@@ -26,6 +26,6 @@ RUN mkdir -p \
     context/global \
     runs
 
-EXPOSE 8099
+EXPOSE 8099 8110
 
 CMD ["./mcp-workbench"]

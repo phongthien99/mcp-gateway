@@ -16,6 +16,103 @@ Tài liệu này tổng hợp lại các User Stories / project items đã thấ
 | `docs/` | Có blog/architecture narrative và user story summary |
 | `artifacts/demo/` | Có discovery và technical plan cho project React UI |
 
+## Biểu đồ use case
+
+### Tổng quan actors và capabilities
+
+```mermaid
+flowchart LR
+    Developer[Developer]
+    Assistant[AI Assistant / Claude]
+    Stakeholder[Stakeholder]
+
+    subgraph Workbench[MCP Workbench]
+        Server[Run MCP server\nUS-01, US-02]
+        ArtifactTools[Artifact tools\nUS-03, US-04, US-05]
+        ContextTools[Context tools\nUS-06, US-07]
+        PromptRegistry[Workflow prompt registry\nUS-08, US-09]
+        Resources[MCP resources\nUS-10]
+        Runner[CLI dry-run runner\nUS-11]
+        Docs[Docs and Hugo dashboard\nUS-12, US-14, US-15, US-16]
+        Branding[Product naming\nUS-19]
+    end
+
+    Developer --> Server
+    Developer --> ContextTools
+    Developer --> Runner
+    Developer --> Docs
+    Developer --> Branding
+
+    Assistant --> ArtifactTools
+    Assistant --> ContextTools
+    Assistant --> PromptRegistry
+    Assistant --> Resources
+
+    Stakeholder --> Docs
+```
+
+### Luồng spec-to-dev qua workflow
+
+```mermaid
+flowchart TD
+    Request[User request] --> Discover[discover\nPrompt: discover_requirement.md]
+    Discover --> Discovery[artifacts/{project}/{feature}/discovery.md]
+    Discovery --> Spec[spec\nPrompt: create_feature_spec.md]
+    Spec --> SpecDoc[artifacts/{project}/{feature}/spec.md]
+    SpecDoc --> Plan[plan\nPrompt: create_technical_plan.md]
+    Context[context/{project_id}/ + context/global/] --> Plan
+    Plan --> PlanDoc[artifacts/{project}/{feature}/plan.md]
+    PlanDoc --> Tasks[tasks\nPrompt: breakdown_tasks.md]
+    SpecDoc --> Tasks
+    Tasks --> TasksDoc[artifacts/{project}/{feature}/tasks.md]
+```
+
+### Luồng khởi tạo project context
+
+```mermaid
+flowchart TD
+    Claude[Claude chat] --> InitPrompt[Prompt init]
+    InitPrompt --> InitTool[init_project(project_id)]
+    InitTool --> Templates[Create templates\narchitecture, coding-standards, compliance-rules]
+    InitTool --> ContextIndex[Create context/{project_id}/_index.md\nUS-17]
+    Templates --> SetContext[set_context x3]
+    SetContext --> Architecture[context/{project_id}/architecture.md]
+    SetContext --> Coding[context/{project_id}/coding-standards.md]
+    SetContext --> Compliance[context/{project_id}/compliance-rules.md]
+    SetContext --> ListContext[list_context(project_id)]
+```
+
+### Artifact documentation auto-index
+
+```mermaid
+flowchart TD
+    WriteArtifact[write_artifact(path, content)] --> ValidatePath[Validate artifact path]
+    ValidatePath --> CreateParents[Create parent folders]
+    CreateParents --> EnsureIndexes[Ensure missing _index.md files\nUS-18]
+    EnsureIndexes --> RootIndex[artifacts/_index.md]
+    EnsureIndexes --> ProjectIndex[artifacts/{project}/_index.md]
+    EnsureIndexes --> FeatureIndex[artifacts/{project}/{feature}/_index.md]
+    EnsureIndexes --> ArtifactFile[Write artifact file]
+    ArtifactFile --> HugoTree[Visible in Hugo docs tree]
+```
+
+### Backlog React UI
+
+```mermaid
+flowchart TD
+    UI01[UI-01 Setup Vite + React + TypeScript + shadcn/ui] --> UI02[UI-02 Layout SPA]
+    UI02 --> UI03[UI-03 REST API Artifacts]
+    UI03 --> UI04[UI-04 Artifacts list]
+    UI03 --> UI05[UI-05 Artifact detail/editor]
+    UI02 --> UI06[UI-06 REST API Workflows and Runs]
+    UI06 --> UI07[UI-07 Workflows list/detail + trigger]
+    UI06 --> UI08[UI-08 Run log viewer]
+    UI02 --> UI09[UI-09 REST API health/stats]
+    UI09 --> UI10[UI-10 Dashboard stats]
+    UI02 --> UI11[UI-11 REST API Prompts]
+    UI11 --> UI12[UI-12 Prompts list/editor]
+```
+
 ## US đã có trong code
 
 | US ID | User Story | Trạng thái | Bằng chứng |

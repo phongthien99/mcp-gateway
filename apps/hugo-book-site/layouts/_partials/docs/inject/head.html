@@ -1,0 +1,364 @@
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/markdown/markdown.min.js" defer></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/yaml/yaml.min.js" defer></script>
+<script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js" defer></script>
+{{- $fileAPIBase := default "http://localhost:8110" site.Params.FileAPIBaseURL -}}
+<script>
+  window.MCP_DEFAULT_FILE_API_BASE = {{ $fileAPIBase | jsonify }};
+</script>
+
+<style>
+  .mcp-page-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin: 0 0 1rem;
+    position: relative;
+  }
+
+  .mcp-action-menu {
+    position: relative;
+  }
+
+  .mcp-action-menu summary {
+    align-items: center;
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    color: var(--body-font-color);
+    cursor: pointer;
+    display: inline-flex;
+    height: 2rem;
+    justify-content: center;
+    list-style: none;
+    width: 2rem;
+  }
+
+  .mcp-action-menu summary::-webkit-details-marker {
+    display: none;
+  }
+
+  .mcp-action-menu summary:hover {
+    background: var(--gray-100);
+  }
+
+  .mcp-action-dropdown {
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-radius: 6px;
+    box-shadow: 0 0.35rem 1rem rgba(0, 0, 0, 0.12);
+    min-width: 11rem;
+    padding: 0.35rem;
+    position: absolute;
+    right: 0;
+    top: calc(100% + 0.35rem);
+    z-index: 20;
+  }
+
+  .mcp-action-dropdown a,
+  .mcp-action-dropdown button {
+    background: transparent;
+    border: 0;
+    border-radius: 4px;
+    color: var(--body-font-color);
+    display: block;
+    font-size: 0.875rem;
+    font: inherit;
+    padding: 0.5rem 0.65rem;
+    text-decoration: none;
+    text-align: left;
+    white-space: nowrap;
+    width: 100%;
+  }
+
+  .mcp-action-dropdown a:hover,
+  .mcp-action-dropdown button:hover {
+    background: var(--gray-100);
+    cursor: pointer;
+    text-decoration: none;
+  }
+
+  .mcp-editor-modal[hidden] {
+    display: none;
+  }
+
+  .mcp-editor-backdrop {
+    background: rgba(0, 0, 0, 0.48);
+    inset: 0;
+    position: fixed;
+    z-index: 80;
+  }
+
+  .mcp-editor-panel {
+    background: var(--body-background);
+    border: 1px solid var(--gray-200);
+    border-radius: 8px;
+    box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.24);
+    display: flex;
+    flex-direction: column;
+    inset: 5vh 4vw;
+    max-height: 90vh;
+    position: fixed;
+    z-index: 81;
+  }
+
+  .mcp-editor-header,
+  .mcp-editor-footer {
+    align-items: center;
+    display: flex;
+    gap: 0.75rem;
+    justify-content: space-between;
+    padding: 0.75rem 1rem;
+  }
+
+  .mcp-editor-header {
+    border-bottom: 1px solid var(--gray-200);
+  }
+
+  .mcp-editor-header span {
+    color: var(--gray-600);
+    display: block;
+    font-size: 0.8125rem;
+    margin-top: 0.2rem;
+  }
+
+  .mcp-editor-header button {
+    align-items: center;
+    background: transparent;
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    color: var(--body-font-color);
+    cursor: pointer;
+    display: inline-flex;
+    font-size: 1.25rem;
+    height: 2rem;
+    justify-content: center;
+    line-height: 1;
+    width: 2rem;
+  }
+
+  .mcp-editor-grid {
+    display: grid;
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    min-height: 0;
+  }
+
+  .mcp-editor-pane,
+  .mcp-preview-pane {
+    min-height: 0;
+    overflow: auto;
+  }
+
+  .mcp-editor-pane {
+    border-right: 1px solid var(--gray-200);
+  }
+
+  .mcp-editor-pane .CodeMirror {
+    height: 100%;
+    min-height: 60vh;
+  }
+
+  .mcp-preview-pane {
+    padding: 1rem;
+  }
+
+  .mcp-preview-title {
+    color: var(--gray-600);
+    font-size: 0.8125rem;
+    margin-bottom: 0.75rem;
+  }
+
+  .mcp-editor-footer {
+    border-top: 1px solid var(--gray-200);
+    justify-content: flex-end;
+  }
+
+  .mcp-editor-footer button,
+  .mcp-editor-footer a {
+    border: 1px solid var(--gray-200);
+    border-radius: 4px;
+    color: var(--body-font-color);
+    font-size: 0.875rem;
+    padding: 0.45rem 0.65rem;
+    text-decoration: none;
+  }
+
+  .mcp-editor-footer button {
+    background: transparent;
+    cursor: pointer;
+  }
+
+  @media (max-width: 48rem) {
+    .mcp-editor-panel {
+      inset: 2vh 2vw;
+    }
+
+    .mcp-editor-grid {
+      grid-template-columns: 1fr;
+    }
+
+    .mcp-editor-pane {
+      border-bottom: 1px solid var(--gray-200);
+      border-right: 0;
+    }
+
+    .mcp-editor-pane .CodeMirror {
+      min-height: 38vh;
+    }
+  }
+</style>
+
+<script>
+  window.addEventListener("DOMContentLoaded", function () {
+    const editors = new Map();
+
+    function normalizeAPIBase(value) {
+      let base = String(value || "").trim();
+      try {
+        base = decodeURIComponent(base);
+      } catch (_) {
+        // Keep the original value when it is not URI encoded.
+      }
+      base = base.replace(/^['"]+|['"]+$/g, "").replace(/\/+$/, "");
+      if (!/^https?:\/\//.test(base)) {
+        return "http://localhost:8110";
+      }
+      return base;
+    }
+
+    const params = new URLSearchParams(window.location.search);
+    const apiBaseFromQuery = params.get("file_api_base");
+    if (apiBaseFromQuery) {
+      window.localStorage.setItem("MCP_FILE_API_BASE", normalizeAPIBase(apiBaseFromQuery));
+    }
+    window.MCP_FILE_API_BASE = normalizeAPIBase(
+      window.localStorage.getItem("MCP_FILE_API_BASE") ||
+      window.MCP_DEFAULT_FILE_API_BASE ||
+      "http://localhost:8110"
+    );
+    window.localStorage.setItem("MCP_FILE_API_BASE", window.MCP_FILE_API_BASE);
+
+    function renderPreview(modal, editor) {
+      const preview = modal.querySelector(".mcp-preview");
+      if (!preview) return;
+      const value = editor ? editor.getValue() : "";
+      if (window.marked) {
+        preview.innerHTML = window.marked.parse(value);
+      } else {
+        preview.textContent = value;
+      }
+    }
+
+    function ensureEditor(modal) {
+      const textarea = modal.querySelector("textarea");
+      if (!textarea) return null;
+      if (editors.has(textarea.id)) return editors.get(textarea.id);
+
+      const fileLabel = modal.querySelector(".mcp-editor-header span");
+      const path = fileLabel ? fileLabel.textContent : "";
+      const mode = path.endsWith(".yaml") || path.endsWith(".yml") ? "yaml" : "markdown";
+      const editor = window.CodeMirror
+        ? window.CodeMirror.fromTextArea(textarea, {
+            lineNumbers: true,
+            lineWrapping: true,
+            mode: mode,
+            tabSize: 2
+          })
+        : null;
+
+      if (editor) {
+        editor.on("change", function () { renderPreview(modal, editor); });
+        editors.set(textarea.id, editor);
+        renderPreview(modal, editor);
+      }
+      return editor;
+    }
+
+    document.querySelectorAll("[data-mcp-open-editor]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const modal = document.getElementById(button.dataset.mcpOpenEditor);
+        if (!modal) return;
+        const menu = button.closest("details");
+        if (menu) menu.open = false;
+        modal.hidden = false;
+        const editor = ensureEditor(modal);
+        window.setTimeout(function () {
+          if (editor) {
+            editor.refresh();
+            editor.focus();
+          }
+        }, 0);
+      });
+    });
+
+    document.querySelectorAll("[data-mcp-close-editor]").forEach(function (button) {
+      button.addEventListener("click", function () {
+        const modal = button.closest(".mcp-editor-modal");
+        if (modal) modal.hidden = true;
+      });
+    });
+
+    document.querySelectorAll("[data-mcp-copy-editor]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        const editor = editors.get(button.dataset.mcpCopyEditor);
+        const textarea = document.getElementById(button.dataset.mcpCopyEditor);
+        const value = editor ? editor.getValue() : textarea ? textarea.value : "";
+        await navigator.clipboard.writeText(value);
+        button.textContent = "Copied";
+        window.setTimeout(function () { button.textContent = "Copy"; }, 1200);
+      });
+    });
+
+    document.querySelectorAll("[data-mcp-save-editor]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        const editor = editors.get(button.dataset.mcpSaveEditor);
+        const textarea = document.getElementById(button.dataset.mcpSaveEditor);
+        const value = editor ? editor.getValue() : textarea ? textarea.value : "";
+        const previous = button.textContent;
+        button.disabled = true;
+        button.textContent = "Saving";
+        try {
+          const response = await fetch(window.MCP_FILE_API_BASE + "/api/files/write", {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              path: button.dataset.mcpSavePath,
+              content: value
+            })
+          });
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          button.textContent = "Saved";
+          window.setTimeout(function () { window.location.reload(); }, 600);
+        } catch (error) {
+          button.textContent = "Save failed";
+          window.alert(error.message || "Cannot save file");
+          window.setTimeout(function () { button.textContent = previous; }, 1600);
+        } finally {
+          window.setTimeout(function () { button.disabled = false; }, 600);
+        }
+      });
+    });
+
+    document.querySelectorAll("[data-mcp-delete-file]").forEach(function (button) {
+      button.addEventListener("click", async function () {
+        const path = button.dataset.mcpDeleteFile;
+        const menu = button.closest("details");
+        if (menu) menu.open = false;
+        if (!window.confirm("Delete " + path + "?")) return;
+        try {
+          const response = await fetch(window.MCP_FILE_API_BASE + "/api/files?path=" + encodeURIComponent(path), {
+            method: "DELETE"
+          });
+          if (!response.ok) {
+            throw new Error(await response.text());
+          }
+          window.location.href = "../";
+        } catch (error) {
+          window.alert(error.message || "Cannot delete file");
+        }
+      });
+    });
+  });
+</script>

@@ -1,0 +1,57 @@
+{{- $filePath := "" -}}
+{{- with .File -}}
+  {{- $filePath = .Path -}}
+{{- end -}}
+
+{{- $editPath := "" -}}
+{{- if hasPrefix $filePath "docs/context/source/" -}}
+  {{- $editPath = replace $filePath "docs/context/source/" "context/" -}}
+{{- else if hasPrefix $filePath "docs/artifacts/source/" -}}
+  {{- $editPath = replace $filePath "docs/artifacts/source/" "artifacts/" -}}
+{{- else if hasPrefix $filePath "docs/prompts/source/" -}}
+  {{- $editPath = replace $filePath "docs/prompts/source/" "prompts/" -}}
+{{- else if hasPrefix $filePath "docs/workflows/source/" -}}
+  {{- $editPath = replace $filePath "docs/workflows/source/" "workflows/" -}}
+{{- end -}}
+
+{{- if $editPath -}}
+  {{- $editorID := printf "mcp-editor-%s" .File.UniqueID -}}
+  {{- $modalID := printf "mcp-editor-modal-%s" .File.UniqueID -}}
+  <div class="mcp-page-actions">
+    <details class="mcp-action-menu">
+      <summary aria-label="Page actions" title="Page actions">
+        <span aria-hidden="true">⋮</span>
+      </summary>
+      <div class="mcp-action-dropdown">
+        <button type="button" data-mcp-open-editor="{{ $modalID }}">Edit</button>
+        <button type="button" data-mcp-delete-file="{{ $editPath }}">Delete</button>
+      </div>
+    </details>
+  </div>
+
+  <div class="mcp-editor-modal" id="{{ $modalID }}" hidden>
+    <div class="mcp-editor-backdrop" data-mcp-close-editor></div>
+    <section class="mcp-editor-panel" aria-label="Markdown editor">
+      <header class="mcp-editor-header">
+        <div>
+          <strong>Edit draft</strong>
+          <span>{{ $editPath }}</span>
+        </div>
+        <button type="button" data-mcp-close-editor aria-label="Close editor">×</button>
+      </header>
+      <div class="mcp-editor-grid">
+        <div class="mcp-editor-pane">
+          <textarea id="{{ $editorID }}">{{ .RawContent }}</textarea>
+        </div>
+        <div class="mcp-preview-pane">
+          <div class="mcp-preview-title">Preview</div>
+          <div class="mcp-preview markdown"></div>
+        </div>
+      </div>
+      <footer class="mcp-editor-footer">
+        <button type="button" data-mcp-save-editor="{{ $editorID }}" data-mcp-save-path="{{ $editPath }}">Save</button>
+        <button type="button" data-mcp-copy-editor="{{ $editorID }}">Copy</button>
+      </footer>
+    </section>
+  </div>
+{{- end -}}

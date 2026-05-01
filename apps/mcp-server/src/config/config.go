@@ -8,7 +8,14 @@ import (
 )
 
 type AppConfig struct {
-	MCP mcp.Config
+	MCP MCPConfig
+	API APIConfig
+}
+
+type MCPConfig = mcp.Config
+
+type APIConfig struct {
+	Port int
 }
 
 func Load() AppConfig {
@@ -34,12 +41,22 @@ func Load() AppConfig {
 		version = "1.0.0"
 	}
 
+	apiPort := 8110
+	if p := os.Getenv("API_PORT"); p != "" {
+		if v, err := strconv.Atoi(p); err == nil {
+			apiPort = v
+		}
+	}
+
 	return AppConfig{
-		MCP: mcp.Config{
+		MCP: MCPConfig{
 			Name:      name,
 			Version:   version,
 			Transport: transport,
 			Port:      port,
+		},
+		API: APIConfig{
+			Port: apiPort,
 		},
 	}
 }

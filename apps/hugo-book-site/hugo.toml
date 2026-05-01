@@ -23,6 +23,8 @@ disableKinds = ['taxonomy', 'term']
   BookPortableLinks = true
   BookServiceWorker = false
   BookDateFormat = '2006-01-02'
+  FileBrowserBaseURL = 'http://localhost:8080'
+  FileAPIBaseURL = 'http://localhost:8110'
 
 [[menu.after]]
   name = 'GitHub'
