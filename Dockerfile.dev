@@ -1,0 +1,18 @@
+FROM mcp-gateway-hugo-site:latest AS hugo-src
+
+FROM golang:alpine
+
+RUN apk add --no-cache git libstdc++ libgcc
+COPY --from=hugo-src /usr/bin/hugo /usr/bin/hugo
+
+WORKDIR /app
+
+COPY apps/mcp-server/go.mod apps/mcp-server/go.sum ./
+RUN go mod download
+
+COPY scripts/dev-entrypoint.sh /dev-entrypoint.sh
+RUN chmod +x /dev-entrypoint.sh
+
+EXPOSE 8099 8110 1313
+
+ENTRYPOINT ["/dev-entrypoint.sh"]

@@ -7,19 +7,21 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mcp-gateway/src/config"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
-const artifactsRoot = "artifacts"
-
 // ArtifactResources exposes workflow artifacts as MCP resources.
 // URI scheme: resource://artifact/{project}/{feature}/{name}
-// Maps to:    artifacts/{project}/{feature}/{name}.md on disk
-type ArtifactResources struct{}
+// Maps to:    {root}/{project}/{feature}/{name}.md on disk
+type ArtifactResources struct {
+	root string
+}
 
-func NewArtifactResources() *ArtifactResources {
-	return &ArtifactResources{}
+func NewArtifactResources(cfg config.AppConfig) *ArtifactResources {
+	return &ArtifactResources{root: cfg.Dirs.Artifacts}
 }
 
 func (a *ArtifactResources) Register(s *mcpserver.MCPServer) {
@@ -37,7 +39,7 @@ func (a *ArtifactResources) Register(s *mcpserver.MCPServer) {
 func (a *ArtifactResources) read(_ context.Context, req mcp.ReadResourceRequest) ([]mcp.ResourceContents, error) {
 	uri := req.Params.URI
 
-	// resource://artifact/{project}/{feature}/{name}  →  artifacts/{project}/{feature}/{name}.md
+	// resource://artifact/{project}/{feature}/{name}  →  {root}/{project}/{feature}/{name}.md
 	trimmed := strings.TrimPrefix(uri, "resource://artifact/")
 	parts := strings.SplitN(trimmed, "/", 3)
 	if len(parts) != 3 || parts[0] == "" || parts[1] == "" || parts[2] == "" {
@@ -45,7 +47,7 @@ func (a *ArtifactResources) read(_ context.Context, req mcp.ReadResourceRequest)
 	}
 	project, feature, name := parts[0], parts[1], parts[2]
 
-	path := filepath.Join(artifactsRoot, project, feature, name+".md")
+	path := filepath.Join(a.root, project, feature, name+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return nil, fmt.Errorf("artifact not found at %s: %w", path, err)

@@ -169,6 +169,77 @@ Các item dưới đây được lấy từ `artifacts/demo/technical-plan.md`. 
 | UI-11 | REST API Prompts | Planned |
 | UI-12 | Prompts list/editor | Planned |
 
+## Future plan: Epic / User Story / Task intake
+
+Mục tiêu tương lai là thêm một workflow intake để phân loại yêu cầu người dùng thành 3 cấp:
+
+```txt
+Epic
+  -> User Story
+    -> Task
+```
+
+Khi người dùng nhập yêu cầu mới, workflow sẽ:
+
+- Phân loại input là `Epic`, `User Story`, `Task`, hoặc `Needs clarification`.
+- Nếu input quá lớn, tạo `Epic` và break thành nhiều `User Story` nhỏ hơn.
+- Nếu input là một `User Story`, map vào `Epic` phù hợp hoặc đề xuất Epic mới.
+- Nếu input là `Task`, map vào `User Story` phù hợp hoặc đánh dấu orphan task.
+- Sinh traceability dashboard: `Epic -> User Story -> Task`.
+
+### Mermaid: intake decision flow
+
+```mermaid
+flowchart TD
+    Input[User input] --> Classify{Classify input}
+    Classify -->|Too broad / multi-feature| Epic[Create or update Epic]
+    Classify -->|User value + acceptance criteria| US[Create or update User Story]
+    Classify -->|Concrete dev work| Task[Create or update Task]
+    Classify -->|Unclear| Clarify[Ask clarification]
+
+    Epic --> BreakUS[Break into child User Stories]
+    BreakUS --> Trace[Update traceability dashboard]
+
+    US --> MatchEpic{Matching Epic exists?}
+    MatchEpic -->|Yes| LinkEpic[Link US to Epic]
+    MatchEpic -->|No| SuggestEpic[Suggest new Epic]
+    LinkEpic --> Trace
+    SuggestEpic --> Trace
+
+    Task --> MatchUS{Matching US exists?}
+    MatchUS -->|Yes| LinkUS[Link Task to US]
+    MatchUS -->|No| Orphan[Mark orphan task + suggest US]
+    LinkUS --> Trace
+    Orphan --> Trace
+```
+
+### Planned artifacts
+
+| Artifact | Purpose |
+|---|---|
+| `artifacts/{project}/backlog/epics.md` | Danh sách Epic và scope lớn |
+| `artifacts/{project}/backlog/user-stories.md` | User Story, acceptance criteria, Epic mapping |
+| `artifacts/{project}/backlog/tasks.md` | Dev tasks theo FE/BE/DevOps/Docs |
+| `artifacts/{project}/backlog/task-dashboard.md` | Dashboard tổng hợp status, priority, owner, traceability |
+
+### Planned workflow
+
+| File | Purpose |
+|---|---|
+| `workflows/intake-task.yaml` | Workflow phân loại Epic / User Story / Task |
+| `prompts/intake_task.md` | Prompt phân tích input và tạo mapping |
+| `prompts/create_task_dashboard.md` | Prompt sinh dashboard từ epics/user-stories/tasks |
+
+### Future backlog items
+
+| Backlog ID | Hạng mục | Trạng thái scan |
+|---|---|---|
+| BL-01 | Define Epic / User Story / Task markdown schema | Planned |
+| BL-02 | Add `intake-task` workflow | Planned |
+| BL-03 | Add prompt to classify request type | Planned |
+| BL-04 | Add traceability dashboard artifact | Planned |
+| BL-05 | Add orphan task detection and suggested parent US/Epic | Planned |
+
 ## Ghi chú trạng thái
 
 - Code hiện tại tập trung vào MCP Workbench backend, workflow engine và Hugo documentation dashboard, chưa thấy frontend React SPA.

@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mcp-gateway/src/config"
 	"mcp-gateway/src/workflow"
 
 	"github.com/mark3labs/mcp-go/mcp"
@@ -14,23 +15,29 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const artifactsRoot = "artifacts"
-const promptsRoot = "prompts"
-const contextRoot = "context"
-const workflowsDir = "workflows"
 const markdownRulesFile = "markdown_rules.md"
 
 // WorkflowPrompts scans workflows/*.yaml at startup and dynamically registers
 // one MCP prompt per step. Adding a new step or workflow requires only YAML +
 // a .md file — no Go changes needed.
-type WorkflowPrompts struct{}
+type WorkflowPrompts struct {
+	artifacts string
+	prompts   string
+	context   string
+	workflows string
+}
 
-func NewWorkflowPrompts() *WorkflowPrompts {
-	return &WorkflowPrompts{}
+func NewWorkflowPrompts(cfg config.AppConfig) *WorkflowPrompts {
+	return &WorkflowPrompts{
+		artifacts: cfg.Dirs.Artifacts,
+		prompts:   cfg.Dirs.Prompts,
+		context:   cfg.Dirs.Context,
+		workflows: cfg.Dirs.Workflows,
+	}
 }
 
 func (w *WorkflowPrompts) Register(s *mcpserver.MCPServer) {
-	files, err := filepath.Glob(filepath.Join(workflowsDir, "*.yaml"))
+	files, err := filepath.Glob(filepath.Join(w.workflows, "*.yaml"))
 	if err != nil || len(files) == 0 {
 		return
 	}
@@ -127,7 +134,7 @@ func (w *WorkflowPrompts) buildHandler(step workflow.Step) mcpserver.PromptHandl
 // ─── helpers ──────────────────────────────────────────────────────────────────
 
 func (w *WorkflowPrompts) renderPrompt(promptFile string, vars map[string]string) (string, error) {
-	path := filepath.Join(promptsRoot, promptFile)
+	path := filepath.Join(w.prompts, promptFile)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("prompt file %q not found: %w", path, err)
@@ -140,7 +147,7 @@ func (w *WorkflowPrompts) renderPrompt(promptFile string, vars map[string]string
 }
 
 func (w *WorkflowPrompts) readPromptInclude(name string) string {
-	data, err := os.ReadFile(filepath.Join(promptsRoot, name))
+	data, err := os.ReadFile(filepath.Join(w.prompts, name))
 	if err != nil {
 		return ""
 	}
@@ -148,7 +155,7 @@ func (w *WorkflowPrompts) readPromptInclude(name string) string {
 }
 
 func (w *WorkflowPrompts) readArtifact(projectID, featureID, name string) (string, error) {
-	path := filepath.Join(artifactsRoot, projectID, featureID, name+".md")
+	path := filepath.Join(w.artifacts, projectID, featureID, name+".md")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("artifact %q not found (project=%s, feature=%s) — run previous steps first",
@@ -159,15 +166,15 @@ func (w *WorkflowPrompts) readArtifact(projectID, featureID, name string) (strin
 
 // readContext loads a reference doc, preferring project-scoped over global.
 //
-//	context/{project_id}/{name}.md  →  project-specific version
-//	context/global/{name}.md        →  fallback shared version
+//	{context}/{project_id}/{name}.md  →  project-specific version
+//	{context}/global/{name}.md        →  fallback shared version
 func (w *WorkflowPrompts) readContext(projectID, name string) (string, error) {
-	projectPath := filepath.Join(contextRoot, projectID, name+".md")
+	projectPath := filepath.Join(w.context, projectID, name+".md")
 	if data, err := os.ReadFile(projectPath); err == nil {
 		return string(data), nil
 	}
 
-	globalPath := filepath.Join(contextRoot, "global", name+".md")
+	globalPath := filepath.Join(w.context, "global", name+".md")
 	if data, err := os.ReadFile(globalPath); err == nil {
 		return string(data), nil
 	}

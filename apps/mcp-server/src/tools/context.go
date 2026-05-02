@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mcp-gateway/src/config"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
-
-const contextRoot = "context"
 
 // contextTemplates are the standard context doc names with their default content.
 var contextTemplates = map[string]string{
@@ -95,9 +95,13 @@ Security, data privacy, logging, auditability, and domain-specific compliance.
 `,
 }
 
-type ContextTools struct{}
+type ContextTools struct {
+	root string
+}
 
-func NewContextTools() *ContextTools { return &ContextTools{} }
+func NewContextTools(cfg config.AppConfig) *ContextTools {
+	return &ContextTools{root: cfg.Dirs.Context}
+}
 
 func (c *ContextTools) Register(s *mcpserver.MCPServer) {
 	s.AddTool(mcp.NewTool("init_project",
@@ -150,13 +154,13 @@ func (c *ContextTools) initProject(_ context.Context, req mcp.CallToolRequest) (
 		return mcp.NewToolResultError("project_id is required"), nil
 	}
 
-	dir := filepath.Join(contextRoot, projectID)
+	dir := filepath.Join(c.root, projectID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create context dir: %v", err)), nil
 	}
 
 	var created []string
-	createdIndex, err := ensureProjectIndex(projectID)
+	createdIndex, err := c.ensureProjectIndex(projectID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot write _index.md: %v", err)), nil
 	}
@@ -201,8 +205,8 @@ Project-specific context for %s.
 `, title, title, projectID)
 }
 
-func ensureProjectIndex(projectID string) (string, error) {
-	indexPath := filepath.Join(contextRoot, projectID, "_index.md")
+func (c *ContextTools) ensureProjectIndex(projectID string) (string, error) {
+	indexPath := filepath.Join(c.root, projectID, "_index.md")
 	if _, err := os.Stat(indexPath); err == nil {
 		return "", nil
 	} else if !os.IsNotExist(err) {
@@ -224,11 +228,11 @@ func (c *ContextTools) setContext(_ context.Context, req mcp.CallToolRequest) (*
 		return mcp.NewToolResultError("project_id and name are required"), nil
 	}
 
-	dir := filepath.Join(contextRoot, projectID)
+	dir := filepath.Join(c.root, projectID)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create context dir: %v", err)), nil
 	}
-	createdIndex, err := ensureProjectIndex(projectID)
+	createdIndex, err := c.ensureProjectIndex(projectID)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot write _index.md: %v", err)), nil
 	}
@@ -251,12 +255,12 @@ func (c *ContextTools) getContext(_ context.Context, req mcp.CallToolRequest) (*
 		return mcp.NewToolResultError("project_id and name are required"), nil
 	}
 
-	projectPath := filepath.Join(contextRoot, projectID, name+".md")
+	projectPath := filepath.Join(c.root, projectID, name+".md")
 	if data, err := os.ReadFile(projectPath); err == nil {
 		return mcp.NewToolResultText(string(data)), nil
 	}
 
-	globalPath := filepath.Join(contextRoot, "global", name+".md")
+	globalPath := filepath.Join(c.root, "global", name+".md")
 	if data, err := os.ReadFile(globalPath); err == nil {
 		return mcp.NewToolResultText(string(data)), nil
 	}
@@ -270,7 +274,7 @@ func (c *ContextTools) listContext(_ context.Context, req mcp.CallToolRequest) (
 	seen := map[string]string{} // name → source label
 
 	if projectID != "" {
-		dir := filepath.Join(contextRoot, projectID)
+		dir := filepath.Join(c.root, projectID)
 		entries, _ := os.ReadDir(dir)
 		for _, e := range entries {
 			if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {
@@ -283,7 +287,7 @@ func (c *ContextTools) listContext(_ context.Context, req mcp.CallToolRequest) (
 		}
 	}
 
-	globalDir := filepath.Join(contextRoot, "global")
+	globalDir := filepath.Join(c.root, "global")
 	entries, _ := os.ReadDir(globalDir)
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".md") {

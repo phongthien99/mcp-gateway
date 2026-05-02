@@ -17,7 +17,8 @@ import (
 )
 
 type FileServer struct {
-	cfg config.APIConfig
+	cfg   config.APIConfig
+	roots map[string]string
 }
 
 type fileInfo struct {
@@ -42,18 +43,19 @@ type fileWriteResponse struct {
 	Size int    `json:"size"`
 }
 
-var editableRoots = map[string]string{
-	"prompts":      "prompts",
-	"workflows":    "workflows",
-	"context":      "context",
-	"artifacts":    "artifacts",
-	"runs":         "runs",
-	"docs":         "docs",
-	"hugo-content": "hugo-content",
-}
-
 func NewFileServer(cfg config.AppConfig) *FileServer {
-	return &FileServer{cfg: cfg.API}
+	return &FileServer{
+		cfg: cfg.API,
+		roots: map[string]string{
+			"prompts":      cfg.Dirs.Prompts,
+			"workflows":    cfg.Dirs.Workflows,
+			"context":      cfg.Dirs.Context,
+			"artifacts":    cfg.Dirs.Artifacts,
+			"runs":         cfg.Dirs.Runs,
+			"docs":         cfg.Dirs.Docs,
+			"hugo-content": cfg.Dirs.HugoContent,
+		},
+	}
 }
 
 func RegisterFileServer(lc fx.Lifecycle, fs *FileServer) {
@@ -105,7 +107,7 @@ func (fs *FileServer) listFiles(w http.ResponseWriter, r *http.Request) {
 		fs.listEditableRoots(w)
 		return
 	}
-	full, rel, err := safeEditablePath(path)
+	full, rel, err := fs.safeEditablePath(path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -138,8 +140,8 @@ func (fs *FileServer) listFiles(w http.ResponseWriter, r *http.Request) {
 }
 
 func (fs *FileServer) listEditableRoots(w http.ResponseWriter) {
-	roots := make([]fileInfo, 0, len(editableRoots))
-	for root := range editableRoots {
+	roots := make([]fileInfo, 0, len(fs.roots))
+	for root := range fs.roots {
 		roots = append(roots, fileInfo{
 			Path:  root,
 			Name:  root,
@@ -160,7 +162,7 @@ func (fs *FileServer) handleRead(w http.ResponseWriter, r *http.Request) {
 	}
 
 	path := r.URL.Query().Get("path")
-	full, rel, err := safeEditablePath(path)
+	full, rel, err := fs.safeEditablePath(path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -188,7 +190,7 @@ func (fs *FileServer) handleWrite(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, fmt.Sprintf("invalid json: %v", err), http.StatusBadRequest)
 		return
 	}
-	full, rel, err := safeEditablePath(req.Path)
+	full, rel, err := fs.safeEditablePath(req.Path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -206,7 +208,7 @@ func (fs *FileServer) handleWrite(w http.ResponseWriter, r *http.Request) {
 
 func (fs *FileServer) deleteFile(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
-	full, _, err := safeEditablePath(path)
+	full, _, err := fs.safeEditablePath(path)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -218,7 +220,7 @@ func (fs *FileServer) deleteFile(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-func safeEditablePath(path string) (string, string, error) {
+func (fs *FileServer) safeEditablePath(path string) (string, string, error) {
 	if path == "" {
 		return "", "", fmt.Errorf("path is required")
 	}
@@ -234,7 +236,7 @@ func safeEditablePath(path string) (string, string, error) {
 	}
 
 	root := strings.Split(clean, "/")[0]
-	base, ok := editableRoots[root]
+	base, ok := fs.roots[root]
 	if !ok {
 		return "", "", fmt.Errorf("path root %q is not editable", root)
 	}

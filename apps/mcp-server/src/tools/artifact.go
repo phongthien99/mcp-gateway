@@ -7,16 +7,18 @@ import (
 	"path/filepath"
 	"strings"
 
+	"mcp-gateway/src/config"
+
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
-const artifactsRoot = "artifacts"
+type ArtifactTools struct {
+	root string
+}
 
-type ArtifactTools struct{}
-
-func NewArtifactTools() *ArtifactTools {
-	return &ArtifactTools{}
+func NewArtifactTools(cfg config.AppConfig) *ArtifactTools {
+	return &ArtifactTools{root: cfg.Dirs.Artifacts}
 }
 
 func (a *ArtifactTools) Register(s *mcpserver.MCPServer) {
@@ -49,7 +51,7 @@ func (a *ArtifactTools) Register(s *mcpserver.MCPServer) {
 }
 
 func (a *ArtifactTools) resolve(path string) string {
-	return filepath.Join(artifactsRoot, path)
+	return filepath.Join(a.root, path)
 }
 
 func (a *ArtifactTools) readArtifact(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -57,7 +59,7 @@ func (a *ArtifactTools) readArtifact(_ context.Context, req mcp.CallToolRequest)
 	if path == "" {
 		return mcp.NewToolResultError("path is required"), nil
 	}
-	full, err := safeArtifactPath(path)
+	full, err := a.safeArtifactPath(path)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -74,7 +76,7 @@ func (a *ArtifactTools) writeArtifact(_ context.Context, req mcp.CallToolRequest
 	if path == "" {
 		return mcp.NewToolResultError("path is required"), nil
 	}
-	full, err := safeArtifactPath(path)
+	full, err := a.safeArtifactPath(path)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -82,14 +84,14 @@ func (a *ArtifactTools) writeArtifact(_ context.Context, req mcp.CallToolRequest
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create parent directories: %v", err)), nil
 	}
-	createdIndexes, err := ensureArtifactIndexes(parentDir)
+	createdIndexes, err := a.ensureArtifactIndexes(parentDir)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create artifact indexes: %v", err)), nil
 	}
 	if err := os.WriteFile(full, []byte(content), 0644); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot write artifact: %v", err)), nil
 	}
-	rel, _ := filepath.Rel(artifactsRoot, full)
+	rel, _ := filepath.Rel(a.root, full)
 	msg := fmt.Sprintf("written %d bytes to artifacts/%s", len(content), rel)
 	if len(createdIndexes) > 0 {
 		msg += fmt.Sprintf("\ncreated indexes:\n  %s", strings.Join(createdIndexes, "\n  "))
@@ -99,10 +101,10 @@ func (a *ArtifactTools) writeArtifact(_ context.Context, req mcp.CallToolRequest
 
 func (a *ArtifactTools) listArtifacts(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	workflow := mcp.ParseArgument(req, "workflow", "").(string)
-	root := artifactsRoot
+	root := a.root
 	if workflow != "" {
 		var err error
-		root, err = safeArtifactPath(workflow)
+		root, err = a.safeArtifactPath(workflow)
 		if err != nil {
 			return mcp.NewToolResultError(err.Error()), nil
 		}
@@ -117,7 +119,7 @@ func (a *ArtifactTools) listArtifacts(_ context.Context, req mcp.CallToolRequest
 			if info.Name() == "_index.md" {
 				return nil
 			}
-			rel, _ := filepath.Rel(artifactsRoot, path)
+			rel, _ := filepath.Rel(a.root, path)
 			sb.WriteString(rel + "\n")
 		}
 		return nil
@@ -131,8 +133,8 @@ func (a *ArtifactTools) listArtifacts(_ context.Context, req mcp.CallToolRequest
 	return mcp.NewToolResultText(sb.String()), nil
 }
 
-func ensureArtifactIndexes(parentDir string) ([]string, error) {
-	root := filepath.Clean(artifactsRoot)
+func (a *ArtifactTools) ensureArtifactIndexes(parentDir string) ([]string, error) {
+	root := filepath.Clean(a.root)
 	parentDir = filepath.Clean(parentDir)
 
 	var dirs []string
@@ -142,7 +144,7 @@ func ensureArtifactIndexes(parentDir string) ([]string, error) {
 			return nil, err
 		}
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return nil, fmt.Errorf("artifact path escapes %s", artifactsRoot)
+			return nil, fmt.Errorf("artifact path escapes %s", a.root)
 		}
 		dirs = append(dirs, dir)
 		if dir == root {
@@ -160,30 +162,30 @@ func ensureArtifactIndexes(parentDir string) ([]string, error) {
 			return nil, err
 		}
 
-		content, err := artifactIndexContent(dir)
+		content, err := a.artifactIndexContent(dir)
 		if err != nil {
 			return nil, err
 		}
 		if err := os.WriteFile(indexPath, []byte(content), 0644); err != nil {
 			return nil, err
 		}
-		rel, _ := filepath.Rel(artifactsRoot, indexPath)
+		rel, _ := filepath.Rel(a.root, indexPath)
 		created = append(created, "artifacts/"+rel)
 	}
 
 	return created, nil
 }
 
-func safeArtifactPath(path string) (string, error) {
+func (a *ArtifactTools) safeArtifactPath(path string) (string, error) {
 	clean := filepath.Clean(path)
 	if clean == "." || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
 		return "", fmt.Errorf("invalid artifact path %q", path)
 	}
-	return filepath.Join(artifactsRoot, clean), nil
+	return filepath.Join(a.root, clean), nil
 }
 
-func artifactIndexContent(dir string) (string, error) {
-	rel, err := filepath.Rel(artifactsRoot, dir)
+func (a *ArtifactTools) artifactIndexContent(dir string) (string, error) {
+	rel, err := filepath.Rel(a.root, dir)
 	if err != nil {
 		return "", err
 	}
