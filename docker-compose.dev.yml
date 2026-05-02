@@ -18,7 +18,7 @@ services:
       DOCS_ROOT: /hugo-src/content/docs
     volumes:
       # Go source — go run . watches this
-      - ./apps/mcp-server:/app
+      # - ./apps/mcp-server:/app
       # Hugo source — hugo server watches this
       - ./apps/hugo-book-site:/hugo-src
       # Go module cache — tránh download lại mỗi lần restart
@@ -28,8 +28,8 @@ services:
       - ./prompts:/hugo-src/content/docs/prompts/source
       - ./context:/hugo-src/content/docs/context/source
       - ./artifacts:/hugo-src/content/docs/artifacts/source
-      - ./runs:/app/runs
-      - ./docs:/app/docs
+      # - ./runs:/app/runs
+      # - ./docs:/app/docs
     restart: unless-stopped
 
 volumes:

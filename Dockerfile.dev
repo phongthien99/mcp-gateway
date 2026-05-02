@@ -10,6 +10,10 @@ WORKDIR /app
 COPY apps/mcp-server/go.mod apps/mcp-server/go.sum ./
 RUN go mod download
 
+# Bake Go source + Hugo site into image (prod self-contained)
+COPY apps/mcp-server/ .
+COPY apps/hugo-book-site/ /hugo-src/
+
 COPY scripts/dev-entrypoint.sh /dev-entrypoint.sh
 RUN chmod +x /dev-entrypoint.sh
 
