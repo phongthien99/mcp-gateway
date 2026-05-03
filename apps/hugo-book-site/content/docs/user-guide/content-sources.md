@@ -16,7 +16,7 @@ The Docker Compose dashboard mount also keeps the existing repository data avail
 
 ## Ownership
 
-Use [File Ownership]({{< relref "/docs/file-ownership" >}}) to distinguish:
+Use [File Ownership]({{< relref "/docs/user-guide/file-ownership" >}}) to distinguish:
 
 - System app files that implement the gateway and dashboard.
 - Shared editable configuration that defines prompts, workflows, and global defaults.

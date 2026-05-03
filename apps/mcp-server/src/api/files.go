@@ -43,6 +43,27 @@ type fileWriteResponse struct {
 	Size int    `json:"size"`
 }
 
+type fileMkdirRequest struct {
+	Path string `json:"path"`
+}
+
+type fileMkdirResponse struct {
+	Path string `json:"path"`
+}
+
+func titleFromDirName(name string) string {
+	words := strings.Fields(strings.ReplaceAll(name, "-", " "))
+	for i, w := range words {
+		if len(w) > 0 {
+			words[i] = strings.ToUpper(w[:1]) + w[1:]
+		}
+	}
+	if len(words) == 0 {
+		return name
+	}
+	return strings.Join(words, " ")
+}
+
 func NewFileServer(cfg config.AppConfig) *FileServer {
 	return &FileServer{
 		cfg: cfg.API,
@@ -62,6 +83,7 @@ func RegisterFileServer(lc fx.Lifecycle, fs *FileServer) {
 	mux.HandleFunc("/api/files", fs.handleFiles)
 	mux.HandleFunc("/api/files/read", fs.handleRead)
 	mux.HandleFunc("/api/files/write", fs.handleWrite)
+	mux.HandleFunc("/api/files/mkdir", fs.handleMkdir)
 
 	server := &http.Server{
 		Addr:              fmt.Sprintf(":%d", fs.cfg.Port),
@@ -205,6 +227,39 @@ func (fs *FileServer) handleWrite(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, fileWriteResponse{Path: rel, Size: len(req.Content)})
 }
 
+func (fs *FileServer) handleMkdir(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodOptions {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+	var req fileMkdirRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, fmt.Sprintf("invalid json: %v", err), http.StatusBadRequest)
+		return
+	}
+	full, rel, err := fs.safeEditablePath(req.Path)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if err := os.MkdirAll(full, 0755); err != nil {
+		http.Error(w, fmt.Sprintf("cannot create directory: %v", err), http.StatusInternalServerError)
+		return
+	}
+	indexPath := filepath.Join(full, "_index.md")
+	if _, err := os.Stat(indexPath); os.IsNotExist(err) {
+		title := titleFromDirName(filepath.Base(full))
+		content := fmt.Sprintf("---\ntitle: %q\nweight: 10\nbookCollapseSection: true\n---\n\n# %s\n", title, title)
+		_ = os.WriteFile(indexPath, []byte(content), 0644)
+	}
+	w.WriteHeader(http.StatusCreated)
+	writeJSON(w, fileMkdirResponse{Path: rel})
+}
+
 func (fs *FileServer) deleteFile(w http.ResponseWriter, r *http.Request) {
 	path := r.URL.Query().Get("path")
 	full, _, err := fs.safeEditablePath(path)
@@ -261,7 +316,7 @@ func withCORS(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Vary", "Origin")
 		}
-		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, PUT, POST, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
 		next.ServeHTTP(w, r)
 	})

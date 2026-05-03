@@ -19,6 +19,7 @@
 {{- end -}}
 
 {{- if $editPath -}}
+  {{- $dirPath := path.Dir $editPath -}}
   {{- $uid := .RelPermalink | urlize -}}
   {{- with .File }}{{ $uid = .UniqueID }}{{ end -}}
   {{- $editorID := printf "mcp-editor-%s" $uid -}}
@@ -30,6 +31,8 @@
       </summary>
       <div class="mcp-action-dropdown">
         <button type="button" data-mcp-open-editor="{{ $modalID }}">Edit</button>
+        <button type="button" data-mcp-new-file="{{ $dirPath }}">New File</button>
+        <button type="button" data-mcp-new-folder="{{ $dirPath }}">New Folder</button>
         <button type="button" data-mcp-delete-file="{{ $editPath }}">Delete</button>
       </div>
     </details>

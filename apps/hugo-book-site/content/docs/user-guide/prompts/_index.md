@@ -20,7 +20,7 @@ MCP loads these files through workflow prompt definitions and exposes them as re
 
 ## Writing rules
 
-Use the shared [Markdown Rules]({{< relref "/docs/markdown-rules" >}}) for all prompt templates.
+Use the shared [Markdown Rules]({{< relref "/docs/user-guide/markdown-rules" >}}) for all prompt templates.
 
 Prompt files should be stable templates:
 

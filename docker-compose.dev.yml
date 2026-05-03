@@ -17,7 +17,7 @@ services:
       PROJECTS_ROOT: /hugo-src/content/docs/projects
     volumes:
       # Data dirs — edit live, Go và Hugo đọc qua DOCS_ROOT / PROJECTS_ROOT
-      - ./workflows:/hugo-src/content/docs/workflows
-      - ./prompts:/hugo-src/content/docs/prompts/source
-      - ./projects:/hugo-src/content/docs/projects
+      - ./data/workflows:/hugo-src/content/docs/workflows
+      - ./data/prompts:/hugo-src/content/docs/prompts/source
+      - ./data/projects:/hugo-src/content/docs/projects
     restart: unless-stopped
