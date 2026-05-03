@@ -16,3 +16,13 @@ weight: 10
 The goal is a tight feedback loop: the AI client reads context from the workbench, generates or updates artifacts, and you review them in the live dashboard — all without leaving your local environment.
 
 ---
+
+## Features
+
+- **Domain-specific prompts** — define prompt templates as `.md` files tailored to any domain (software engineering, data science, marketing, etc.).
+- **Custom workflows** — declare multi-step processes in YAML; each step links to a prompt template, reads artifacts from previous steps, and writes new ones.
+- **Auto-registration** — the MCP server automatically registers all workflows and prompts at startup with no code changes required.
+- **Context injection** — each step can reference project context documents (architecture, coding standards, compliance rules) so the AI client has full background.
+- **Artifact pipeline** — output of each step (discovery, spec, plan, tasks) is persisted and passed as input to the next step.
+
+---
