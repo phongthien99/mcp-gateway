@@ -17,10 +17,10 @@ services:
       PROJECTS_ROOT: /hugo-src/content/docs/projects
     volumes:
       - ./apps/hugo-book-site:/hugo-src
-      - ./workflows:/hugo-src/content/docs/workflows
-      - ./prompts:/hugo-src/content/docs/prompts/source
-      - ./projects:/hugo-src/content/docs/projects
-      - ./runs:/app/runs
+      - ./data/workflows:/hugo-src/content/docs/workflows
+      - ./data/prompts:/hugo-src/content/docs/prompts/source
+      - ./data/projects:/hugo-src/content/docs/projects
+      - ./data/runs:/app/runs
       - ./docs:/app/docs
     restart: always
     healthcheck:

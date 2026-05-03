@@ -3,6 +3,7 @@ package prompts
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -33,10 +34,17 @@ func NewWorkflowPrompts(cfg config.AppConfig) *WorkflowPrompts {
 }
 
 func (w *WorkflowPrompts) Register(s *mcpserver.MCPServer) {
-	files, err := filepath.Glob(filepath.Join(w.workflows, "*.yaml"))
-	if err != nil || len(files) == 0 {
+	// workflows are stored as {workflows_dir}/{name}/{name}.yaml
+	files, err := filepath.Glob(filepath.Join(w.workflows, "*", "*.yaml"))
+	if err != nil {
+		log.Printf("[workflows] glob %q: %v", w.workflows, err)
 		return
 	}
+	if len(files) == 0 {
+		log.Printf("[workflows] no workflow yaml files found under %q", w.workflows)
+		return
+	}
+	log.Printf("[workflows] found %d workflow file(s) under %q", len(files), w.workflows)
 	for _, f := range files {
 		w.registerWorkflow(s, f)
 	}
@@ -45,10 +53,12 @@ func (w *WorkflowPrompts) Register(s *mcpserver.MCPServer) {
 func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) {
 	data, err := os.ReadFile(path)
 	if err != nil {
+		log.Printf("[workflows] read %q: %v", path, err)
 		return
 	}
 	var def workflow.Def
 	if err := yaml.Unmarshal(data, &def); err != nil {
+		log.Printf("[workflows] parse %q: %v", path, err)
 		return
 	}
 
@@ -57,6 +67,13 @@ func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) 
 		nextStepID := ""
 		if i+1 < len(def.Steps) {
 			nextStepID = def.Steps[i+1].ID
+		}
+
+		promptPath := filepath.Join(w.prompts, step.PromptFile)
+		if _, err := os.Stat(promptPath); err != nil {
+			log.Printf("[prompts] MISSING %q (step %q in workflow %q)", promptPath, step.ID, def.ID)
+		} else {
+			log.Printf("[prompts] ok %q (step %q)", promptPath, step.ID)
 		}
 
 		opts := []mcp.PromptOption{
@@ -72,6 +89,7 @@ func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) 
 
 		s.AddPrompt(mcp.NewPrompt(step.ID, opts...), w.buildHandler(step, nextStepID))
 	}
+	log.Printf("[workflows] registered %q: %d step(s)", def.ID, len(def.Steps))
 }
 
 func (w *WorkflowPrompts) buildHandler(step workflow.Step, nextStepID string) mcpserver.PromptHandlerFunc {
@@ -108,6 +126,7 @@ func (w *WorkflowPrompts) buildHandler(step workflow.Step, nextStepID string) mc
 
 func (w *WorkflowPrompts) renderPrompt(promptFile string, vars map[string]string) (string, error) {
 	path := filepath.Join(w.prompts, promptFile)
+	log.Printf("[prompts] loading %q", path)
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", fmt.Errorf("prompt file %q not found: %w", path, err)

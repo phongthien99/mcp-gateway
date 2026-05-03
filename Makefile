@@ -1,4 +1,7 @@
-.PHONY: all up down mcp-build mcp-run hugo-book-run hugo-book-docker
+IMAGE ?= phongthien/mcp-workbench
+TAG   ?= latest
+
+.PHONY: all up down mcp-build mcp-run hugo-book-run hugo-book-docker docker-build docker-push docker-release
 
 # ── Monorepo ──────────────────────────────────────────────────────────────────
 all: up
@@ -22,3 +25,12 @@ hugo-book-run:
 
 hugo-book-docker:
 	docker compose up hugo-book-site
+
+# ── Docker image ──────────────────────────────────────────────────────────────
+docker-build:
+	docker build -t $(IMAGE):$(TAG) .
+
+docker-push:
+	docker push $(IMAGE):$(TAG)
+
+docker-release: docker-build docker-push

@@ -78,23 +78,32 @@ func loadDirs() DirsConfig {
 		if docsRoot != "" {
 			projectsRoot = filepath.Join(docsRoot, "projects")
 		} else {
-			projectsRoot = "projects"
+			projectsRoot = filepath.Join("data", "projects")
 		}
 	}
 	return DirsConfig{
 		ProjectsRoot: projectsRoot,
 		Prompts:      docsDir(docsRoot, "prompts"),
-		Workflows:    filepath.Join(docsRoot, "workflows"),
+		Workflows:    workflowsDir(docsRoot),
 		Runs:         "runs",
 		Docs:         "docs",
 		HugoContent:  hugoContentDir(docsRoot),
 	}
 }
 
+func workflowsDir(docsRoot string) string {
+	if docsRoot == "" {
+		return filepath.Join("data", "workflows")
+	}
+	return filepath.Join(docsRoot, "workflows")
+}
+
 func docsDir(root, name string) string {
 	if root == "" {
-		return name
+		// local dev: files live directly under data/{name}/
+		return filepath.Join("data", name)
 	}
+	// Docker: volume is mounted at {DOCS_ROOT}/{name}/source
 	return filepath.Join(root, name, "source")
 }
 
