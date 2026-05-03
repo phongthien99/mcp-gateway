@@ -1,5 +1,3 @@
-
-
 services:
   dev:
     build:
@@ -8,7 +6,7 @@ services:
     ports:
       - "${MCP_PORT:-8100}:8099"
       - "${API_PORT:-8110}:8110"
-      - "${HUGO_PORT:-1314}:1313"
+      - "${HUGO_PORT:-1313}:1313"
     environment:
       MCP_TRANSPORT: sse
       MCP_PORT: 8099
@@ -16,21 +14,10 @@ services:
       MCP_VERSION: ${MCP_VERSION:-1.0.0}
       API_PORT: 8110
       DOCS_ROOT: /hugo-src/content/docs
+      PROJECTS_ROOT: /hugo-src/content/docs/projects
     volumes:
-      # Go source — go run . watches this
-      # - ./apps/mcp-server:/app
-      # Hugo source — hugo server watches this
-      - ./apps/hugo-book-site:/hugo-src
-      # Go module cache — tránh download lại mỗi lần restart
-      - go-mod-cache:/root/go/pkg/mod
-      # Data — mount 1 lần, Go đọc qua env vars trỏ vào Hugo content tree
-      - ./workflows:/hugo-src/content/docs/workflows/source
+      # Data dirs — edit live, Go và Hugo đọc qua DOCS_ROOT / PROJECTS_ROOT
+      - ./workflows:/hugo-src/content/docs/workflows
       - ./prompts:/hugo-src/content/docs/prompts/source
-      - ./context:/hugo-src/content/docs/context/source
-      - ./artifacts:/hugo-src/content/docs/artifacts/source
-      # - ./runs:/app/runs
-      # - ./docs:/app/docs
+      - ./projects:/hugo-src/content/docs/projects
     restart: unless-stopped
-
-volumes:
-  go-mod-cache:

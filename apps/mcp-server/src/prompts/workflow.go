@@ -21,17 +21,13 @@ const markdownRulesFile = "markdown_rules.md"
 // one MCP prompt per step. Adding a new step or workflow requires only YAML +
 // a .md file — no Go changes needed.
 type WorkflowPrompts struct {
-	artifacts string
 	prompts   string
-	context   string
 	workflows string
 }
 
 func NewWorkflowPrompts(cfg config.AppConfig) *WorkflowPrompts {
 	return &WorkflowPrompts{
-		artifacts: cfg.Dirs.Artifacts,
 		prompts:   cfg.Dirs.Prompts,
-		context:   cfg.Dirs.Context,
 		workflows: cfg.Dirs.Workflows,
 	}
 }
@@ -56,19 +52,15 @@ func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) 
 		return
 	}
 
-	for _, step := range def.Steps {
+	for i, step := range def.Steps {
 		step := step // capture loop var
+		nextStepID := ""
+		if i+1 < len(def.Steps) {
+			nextStepID = def.Steps[i+1].ID
+		}
 
 		opts := []mcp.PromptOption{
 			mcp.WithPromptDescription(step.Description),
-			mcp.WithArgument("project_id",
-				mcp.ArgumentDescription("ID project để namespace artifacts (vd: my-app)"),
-				mcp.RequiredArgument(),
-			),
-			mcp.WithArgument("feature_id",
-				mcp.ArgumentDescription("Tên feature đang phát triển (vd: export-task-csv)"),
-				mcp.RequiredArgument(),
-			),
 		}
 		for _, arg := range step.ExtraArgs {
 			argOpts := []mcp.ArgumentOption{mcp.ArgumentDescription(arg.Description)}
@@ -78,43 +70,24 @@ func (w *WorkflowPrompts) registerWorkflow(s *mcpserver.MCPServer, path string) 
 			opts = append(opts, mcp.WithArgument(arg.Name, argOpts...))
 		}
 
-		s.AddPrompt(mcp.NewPrompt(step.ID, opts...), w.buildHandler(step))
+		s.AddPrompt(mcp.NewPrompt(step.ID, opts...), w.buildHandler(step, nextStepID))
 	}
 }
 
-func (w *WorkflowPrompts) buildHandler(step workflow.Step) mcpserver.PromptHandlerFunc {
+func (w *WorkflowPrompts) buildHandler(step workflow.Step, nextStepID string) mcpserver.PromptHandlerFunc {
 	return func(_ context.Context, req mcp.GetPromptRequest) (*mcp.GetPromptResult, error) {
 		args := req.Params.Arguments
-		projectID := args["project_id"]
-		featureID := args["feature_id"]
 
 		vars := map[string]string{
-			"project_id":     projectID,
-			"feature_id":     featureID,
 			"markdown_rules": w.readPromptInclude(markdownRulesFile),
+			"step_id":        step.ID,
+			"reads":          strings.Join(step.Reads, ", "),
+			"writes":         step.Writes,
+			"context_docs":   strings.Join(step.Context, ", "),
+			"next_step":      nextStepID,
 		}
-
-		// Extra args forwarded as template vars.
 		for _, arg := range step.ExtraArgs {
 			vars[arg.Name] = args[arg.Name]
-		}
-
-		// Load generated artifacts from previous steps.
-		for _, name := range step.Reads {
-			content, err := w.readArtifact(projectID, featureID, name)
-			if err != nil {
-				return nil, err
-			}
-			vars[name] = content
-		}
-
-		// Load reference/context docs: project-scoped first, fallback to global.
-		for _, name := range step.Context {
-			content, err := w.readContext(projectID, name)
-			if err != nil {
-				return nil, err
-			}
-			vars[name] = content
 		}
 
 		text, err := w.renderPrompt(step.PromptFile, vars)
@@ -154,30 +127,3 @@ func (w *WorkflowPrompts) readPromptInclude(name string) string {
 	return string(data)
 }
 
-func (w *WorkflowPrompts) readArtifact(projectID, featureID, name string) (string, error) {
-	path := filepath.Join(w.artifacts, projectID, featureID, name+".md")
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", fmt.Errorf("artifact %q not found (project=%s, feature=%s) — run previous steps first",
-			name, projectID, featureID)
-	}
-	return string(data), nil
-}
-
-// readContext loads a reference doc, preferring project-scoped over global.
-//
-//	{context}/{project_id}/{name}.md  →  project-specific version
-//	{context}/global/{name}.md        →  fallback shared version
-func (w *WorkflowPrompts) readContext(projectID, name string) (string, error) {
-	projectPath := filepath.Join(w.context, projectID, name+".md")
-	if data, err := os.ReadFile(projectPath); err == nil {
-		return string(data), nil
-	}
-
-	globalPath := filepath.Join(w.context, "global", name+".md")
-	if data, err := os.ReadFile(globalPath); err == nil {
-		return string(data), nil
-	}
-
-	return "", fmt.Errorf("context %q not found at %s or %s", name, projectPath, globalPath)
-}

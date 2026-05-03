@@ -10,9 +10,8 @@ hugo server \
   --noBuildLock \
   --poll=700ms &
 
-# Go server
-cd /app
-go run . &
+# MCP server binary
+/app/server &
 
 # Exit if either process dies
 wait -n 2>/dev/null || wait

@@ -1,6 +1,7 @@
 ---
 title: Prompts
 weight: 20
+bookCollapseSection: true
 ---
 
 # Prompts

@@ -1,0 +1,52 @@
+id: dev
+name: dev-workflow
+
+steps:
+  - id: discover
+    prompt_file: discover_requirement.md
+    description: "Senior Product Analyst: phân tích yêu cầu → sinh discovery.md"
+    extra_args:
+      - name: request
+        description: Nội dung yêu cầu của người dùng cần phân tích
+        required: true
+      - name: existing_features
+        description: "Các feature đã có để tham khảo, cách nhau dấu phẩy (vd: login,export-csv). Bỏ trống nếu không có."
+        required: false
+    reads: []
+    writes: discovery
+
+  - id: spec
+    prompt_file: create_feature_spec.md
+    description: "Solution Designer: đọc discovery.md → sinh spec.md"
+    reads: [discovery]
+    writes: spec
+
+  - id: plan
+    prompt_file: create_technical_plan.md
+    description: "Senior Backend Engineer: đọc spec.md → sinh plan.md"
+    reads: [spec]
+    context: [architecture, coding-standards, compliance-rules]
+    writes: plan
+
+  - id: tasks
+    prompt_file: breakdown_tasks.md
+    description: "Technical Lead: đọc spec.md + plan.md → sinh tasks.md"
+    reads: [spec, plan]
+    context: [coding-standards]
+    writes: tasks
+
+  # - id: kanban
+  #   prompt_file: gen_kanban.md
+  #   description: "Technical Lead: đọc tất cả artifacts → sinh kanban Mermaid board"
+  #   extra_args:
+  #     - name: in_progress
+  #       description: "Step IDs đang chạy, cách nhau dấu phẩy (vd: plan). Bỏ trống nếu không có."
+  #       required: false
+  #     - name: done
+  #       description: "Step IDs đã xong, cách nhau dấu phẩy (vd: discover,spec). Bỏ trống nếu không có."
+  #       required: false
+  #     - name: blocked
+  #       description: "Step IDs bị blocked, cách nhau dấu phẩy. Bỏ trống nếu không có."
+  #       required: false
+  #   reads: [discovery, spec, plan, tasks]
+  #   writes: kanban

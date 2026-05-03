@@ -21,13 +21,12 @@ type APIConfig struct {
 }
 
 type DirsConfig struct {
-	Artifacts   string
-	Prompts     string
-	Context     string
-	Workflows   string
-	Runs        string
-	Docs        string
-	HugoContent string
+	ProjectsRoot string // base dir for all project context + artifacts
+	Prompts      string
+	Workflows    string
+	Runs         string
+	Docs         string
+	HugoContent  string
 }
 
 func Load() AppConfig {
@@ -68,19 +67,27 @@ func Load() AppConfig {
 }
 
 // loadDirs builds directory paths.
-// If DOCS_ROOT is set (e.g. /hugo-src/content/docs), all four content dirs are
-// derived as {DOCS_ROOT}/{name}/source so Go and Hugo share the same paths.
-// Otherwise each dir defaults to a simple relative name.
+// DOCS_ROOT (e.g. /hugo-src/content/docs) is the base for prompts and workflows.
+// PROJECTS_ROOT (e.g. /hugo-src/content/docs/projects) is the single root for all
+// project context and artifacts, organised as {project_id}/context/ and
+// {project_id}/artifacts/. Falls back to {DOCS_ROOT}/projects when not set.
 func loadDirs() DirsConfig {
-	docsRoot := os.Getenv("DOCS_ROOT")
+	docsRoot     := os.Getenv("DOCS_ROOT")
+	projectsRoot := os.Getenv("PROJECTS_ROOT")
+	if projectsRoot == "" {
+		if docsRoot != "" {
+			projectsRoot = filepath.Join(docsRoot, "projects")
+		} else {
+			projectsRoot = "projects"
+		}
+	}
 	return DirsConfig{
-		Artifacts:   docsDir(docsRoot, "artifacts"),
-		Prompts:     docsDir(docsRoot, "prompts"),
-		Context:     docsDir(docsRoot, "context"),
-		Workflows:   docsDir(docsRoot, "workflows"),
-		Runs:        "runs",
-		Docs:        "docs",
-		HugoContent: hugoContentDir(docsRoot),
+		ProjectsRoot: projectsRoot,
+		Prompts:      docsDir(docsRoot, "prompts"),
+		Workflows:    filepath.Join(docsRoot, "workflows"),
+		Runs:         "runs",
+		Docs:         "docs",
+		HugoContent:  hugoContentDir(docsRoot),
 	}
 }
 

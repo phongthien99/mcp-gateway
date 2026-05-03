@@ -49,8 +49,7 @@ func NewFileServer(cfg config.AppConfig) *FileServer {
 		roots: map[string]string{
 			"prompts":      cfg.Dirs.Prompts,
 			"workflows":    cfg.Dirs.Workflows,
-			"context":      cfg.Dirs.Context,
-			"artifacts":    cfg.Dirs.Artifacts,
+			"projects":     cfg.Dirs.ProjectsRoot,
 			"runs":         cfg.Dirs.Runs,
 			"docs":         cfg.Dirs.Docs,
 			"hugo-content": cfg.Dirs.HugoContent,

@@ -4,7 +4,7 @@ services:
   mcp-workbench:
     image: phongthien/mcp-workbench:latest
     ports:
-      - "${MCP_PORT:-8099}:8099"
+      - "${MCP_PORT:-8100}:8099"
       - "${API_PORT:-8110}:8110"
       - "${HUGO_PORT:-1314}:1313"
     environment:
@@ -14,11 +14,12 @@ services:
       MCP_VERSION: ${MCP_VERSION:-1.0.0}
       API_PORT: 8110
       DOCS_ROOT: /hugo-src/content/docs
+      PROJECTS_ROOT: /hugo-src/content/docs/projects
     volumes:
-      - ./workflows:/hugo-src/content/docs/workflows/source
+      - ./apps/hugo-book-site:/hugo-src
+      - ./workflows:/hugo-src/content/docs/workflows
       - ./prompts:/hugo-src/content/docs/prompts/source
-      - ./context:/hugo-src/content/docs/context/source
-      - ./artifacts:/hugo-src/content/docs/artifacts/source
+      - ./projects:/hugo-src/content/docs/projects
       - ./runs:/app/runs
       - ./docs:/app/docs
     restart: always

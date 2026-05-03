@@ -1,0 +1,7 @@
+workflow: workflows/gen-kanban/gen-kanban.yaml
+project_id: demo
+feature_id: kanban-demo
+args:
+  done: "discover,spec"
+  in_progress: "plan"
+  blocked: ""

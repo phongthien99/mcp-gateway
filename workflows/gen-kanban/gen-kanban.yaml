@@ -1,0 +1,20 @@
+id: gen-kanban
+name: Generate Kanban Board
+
+steps:
+  - id: kanban
+    prompt_file: gen_kanban.md
+    description: "Technical Lead: đọc tất cả artifacts → sinh kanban Mermaid board"
+    extra_args:
+      - name: in_progress
+        description: "Step IDs đang chạy, cách nhau dấu phẩy (vd: plan). Bỏ trống nếu không có."
+        required: false
+      - name: done
+        description: "Step IDs đã xong, cách nhau dấu phẩy (vd: discover,spec). Bỏ trống nếu không có."
+        required: false
+      - name: blocked
+        description: "Step IDs bị blocked, cách nhau dấu phẩy. Bỏ trống nếu không có."
+        required: false
+    reads: [discovery, spec, plan, tasks]
+    context: []
+    writes: kanban

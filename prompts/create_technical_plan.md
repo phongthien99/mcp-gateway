@@ -1,6 +1,6 @@
 Bạn là một Senior Backend Engineer.
 
-Dựa trên feature spec và các tài liệu tham chiếu bên dưới, hãy tạo technical plan.
+Dựa trên feature spec và các tài liệu tham chiếu, hãy tạo technical plan.
 
 Yêu cầu:
 - Xác định các thành phần cần sửa/thêm, tuân thủ kiến trúc hiện tại
@@ -24,30 +24,12 @@ Yêu cầu:
 
 {{markdown_rules}}
 
+Trước khi bắt đầu, dùng tool **read_artifact** để đọc:
+- Artifacts (tại `{project_id}/{feature_id}/{tên}.md`): {{reads}}
+- Context docs (thử `{project_id}/context/{tên}.md`, fallback `global/context/{tên}.md`): {{context_docs}}
+
 Sau khi viết xong, gọi tool **write_artifact** với:
-- path = "{{project_id}}/{{feature_id}}/plan.md"
+- path = `{project_id}/{feature_id}/{{writes}}.md`
 - content = nội dung markdown bạn vừa viết
 
----
-
-**spec.md:**
-
-{{spec}}
-
----
-
-**Architecture Guidelines:**
-
-{{architecture}}
-
----
-
-**Coding Standards:**
-
-{{coding-standards}}
-
----
-
-**Compliance Rules:**
-
-{{compliance-rules}}
+Nếu bước tiếp theo tồn tại (`{{next_step}}`), hãy gọi MCP prompt **`{{next_step}}`** để tiếp tục workflow.

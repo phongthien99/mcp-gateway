@@ -8,50 +8,67 @@ import (
 	"strings"
 
 	"mcp-gateway/src/config"
+	"mcp-gateway/src/scope"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	mcpserver "github.com/mark3labs/mcp-go/server"
 )
 
 type ArtifactTools struct {
-	root string
+	projectsRoot string
 }
 
 func NewArtifactTools(cfg config.AppConfig) *ArtifactTools {
-	return &ArtifactTools{root: cfg.Dirs.Artifacts}
+	return &ArtifactTools{projectsRoot: cfg.Dirs.ProjectsRoot}
 }
 
 func (a *ArtifactTools) Register(s *mcpserver.MCPServer) {
 	s.AddTool(mcp.NewTool("read_artifact",
-		mcp.WithDescription("Read an artifact file from the artifacts/ directory. The path may point to markdown, yaml, json, or any other text artifact."),
+		mcp.WithDescription("Read an artifact file. Path format: {project_id}/{feature}/{file} (e.g. react-mui/user-management/spec.md)"),
 		mcp.WithString("path",
 			mcp.Required(),
-			mcp.Description("Relative path under artifacts/ including extension when applicable (e.g. project/feature/discovery.md, project/feature/config.yaml)"),
+			mcp.Description("Relative path as {project_id}/{feature}/{file} including extension"),
 		),
 	), a.readArtifact)
 
 	s.AddTool(mcp.NewTool("write_artifact",
-		mcp.WithDescription("Write content to an artifact file, creating parent directories and Hugo _index.md files as needed. Agents may choose any suitable file extension. Use .md when the artifact is documentation; use .yaml, .json, .txt, image extensions, or another extension when that better matches the artifact."),
+		mcp.WithDescription("Write content to an artifact file, creating parent directories and Hugo _index.md files as needed. Path format: {project_id}/{feature}/{file}"),
 		mcp.WithString("path",
 			mcp.Required(),
-			mcp.Description("Relative path under artifacts/ including the chosen file extension. Documentation should use .md (e.g. project/feature/spec.md); config/data can use other extensions (e.g. project/feature/workflow.yaml)."),
+			mcp.Description("Relative path as {project_id}/{feature}/{file} including extension (e.g. react-mui/user-management/spec.md)"),
 		),
 		mcp.WithString("content",
 			mcp.Required(),
-			mcp.Description("File content to write. For documentation artifacts, write markdown and use a .md path."),
+			mcp.Description("File content to write. Use .md for documentation artifacts."),
 		),
 	), a.writeArtifact)
 
 	s.AddTool(mcp.NewTool("list_artifacts",
-		mcp.WithDescription("List artifact files, optionally scoped to a workflow subdirectory"),
+		mcp.WithDescription("List artifact files, optionally scoped to a project"),
 		mcp.WithString("workflow",
-			mcp.Description("Workflow ID to scope the listing (e.g. export-task-csv)"),
+			mcp.Description("Project ID to scope the listing (e.g. react-mui)"),
 		),
 	), a.listArtifacts)
 }
 
-func (a *ArtifactTools) resolve(path string) string {
-	return filepath.Join(a.root, path)
+// artifactsDir returns the artifacts subdirectory for a project.
+func (a *ArtifactTools) artifactsDir(projectID string) string {
+	return filepath.Join(a.projectsRoot, projectID, "artifacts")
+}
+
+// resolve maps {project_id}/{feature}/{file} → {projectsRoot}/{project_id}/artifacts/{feature}/{file}.
+func (a *ArtifactTools) resolve(path string) (string, error) {
+	clean := filepath.Clean(path)
+	if clean == "." || filepath.IsAbs(clean) || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
+		return "", fmt.Errorf("invalid artifact path %q", path)
+	}
+	parts := strings.SplitN(clean, string(os.PathSeparator), 2)
+	if len(parts) < 2 || parts[0] == "" || parts[1] == "" {
+		return "", fmt.Errorf("artifact path must be {project_id}/{feature}/{file}, got %q", path)
+	}
+	projectID := parts[0]
+	rest := parts[1]
+	return filepath.Join(a.artifactsDir(projectID), rest), nil
 }
 
 func (a *ArtifactTools) readArtifact(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -59,7 +76,7 @@ func (a *ArtifactTools) readArtifact(_ context.Context, req mcp.CallToolRequest)
 	if path == "" {
 		return mcp.NewToolResultError("path is required"), nil
 	}
-	full, err := a.safeArtifactPath(path)
+	full, err := a.resolve(path)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -76,7 +93,7 @@ func (a *ArtifactTools) writeArtifact(_ context.Context, req mcp.CallToolRequest
 	if path == "" {
 		return mcp.NewToolResultError("path is required"), nil
 	}
-	full, err := a.safeArtifactPath(path)
+	full, err := a.resolve(path)
 	if err != nil {
 		return mcp.NewToolResultError(err.Error()), nil
 	}
@@ -84,70 +101,108 @@ func (a *ArtifactTools) writeArtifact(_ context.Context, req mcp.CallToolRequest
 	if err := os.MkdirAll(parentDir, 0755); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create parent directories: %v", err)), nil
 	}
-	createdIndexes, err := a.ensureArtifactIndexes(parentDir)
+
+	// extract projectID to scope index creation
+	parts := strings.SplitN(filepath.Clean(path), string(os.PathSeparator), 2)
+	projectID := parts[0]
+	createdIndexes, err := a.ensureArtifactIndexes(projectID, parentDir)
 	if err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot create artifact indexes: %v", err)), nil
 	}
 	if err := os.WriteFile(full, []byte(content), 0644); err != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("cannot write artifact: %v", err)), nil
 	}
-	rel, _ := filepath.Rel(a.root, full)
-	msg := fmt.Sprintf("written %d bytes to artifacts/%s", len(content), rel)
+	artifactsRoot := a.artifactsDir(projectID)
+	rel, _ := filepath.Rel(artifactsRoot, full)
+	msg := fmt.Sprintf("written %d bytes to %s/artifacts/%s", len(content), projectID, rel)
 	if len(createdIndexes) > 0 {
 		msg += fmt.Sprintf("\ncreated indexes:\n  %s", strings.Join(createdIndexes, "\n  "))
 	}
 	return mcp.NewToolResultText(msg), nil
 }
 
-func (a *ArtifactTools) listArtifacts(_ context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+func (a *ArtifactTools) listArtifacts(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	workflow := mcp.ParseArgument(req, "workflow", "").(string)
-	root := a.root
+	// If no explicit workflow and a project scope is set on the connection, use it.
+	if workflow == "" {
+		workflow = scope.FromContext(ctx)
+	}
+
+	// Returns paths as {project_id}/{feature}/{file} — no "artifacts/" segment —
+	// so the result can be passed directly to read_artifact.
+	var sb strings.Builder
 	if workflow != "" {
-		var err error
-		root, err = a.safeArtifactPath(workflow)
+		root := a.artifactsDir(workflow)
+		err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if !info.IsDir() && info.Name() != "_index.md" {
+				rel, _ := filepath.Rel(root, path)
+				sb.WriteString(filepath.ToSlash(filepath.Join(workflow, rel)) + "\n")
+			}
+			return nil
+		})
 		if err != nil {
-			return mcp.NewToolResultError(err.Error()), nil
+			return mcp.NewToolResultError(fmt.Sprintf("cannot list artifacts: %v", err)), nil
+		}
+	} else {
+		entries, err := os.ReadDir(a.projectsRoot)
+		if err != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("cannot read projects root: %v", err)), nil
+		}
+		for _, e := range entries {
+			if !e.IsDir() {
+				continue
+			}
+			projectID := e.Name()
+			root := a.artifactsDir(projectID)
+			_ = filepath.Walk(root, func(path string, info os.FileInfo, werr error) error {
+				if werr != nil || info.IsDir() || info.Name() == "_index.md" {
+					return nil
+				}
+				rel, _ := filepath.Rel(root, path)
+				sb.WriteString(filepath.ToSlash(filepath.Join(projectID, rel)) + "\n")
+				return nil
+			})
 		}
 	}
 
-	var sb strings.Builder
-	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !info.IsDir() {
-			if info.Name() == "_index.md" {
-				return nil
-			}
-			rel, _ := filepath.Rel(a.root, path)
-			sb.WriteString(rel + "\n")
-		}
-		return nil
-	})
-	if err != nil {
-		return mcp.NewToolResultError(fmt.Sprintf("cannot list artifacts: %v", err)), nil
-	}
 	if sb.Len() == 0 {
 		return mcp.NewToolResultText("(no artifacts found)"), nil
 	}
 	return mcp.NewToolResultText(sb.String()), nil
 }
 
-func (a *ArtifactTools) ensureArtifactIndexes(parentDir string) ([]string, error) {
-	root := filepath.Clean(a.root)
+// ensureArtifactIndexes creates missing _index.md files from parentDir up to
+// and including the project's artifacts/ dir.
+func (a *ArtifactTools) ensureArtifactIndexes(projectID, parentDir string) ([]string, error) {
+	artifactsRoot := filepath.Clean(a.artifactsDir(projectID))
 	parentDir = filepath.Clean(parentDir)
+
+	// ensure project _index.md
+	projectDir := filepath.Join(a.projectsRoot, projectID)
+	if err := os.MkdirAll(projectDir, 0755); err != nil {
+		return nil, err
+	}
+	projectIndex := filepath.Join(projectDir, "_index.md")
+	if _, err := os.Stat(projectIndex); os.IsNotExist(err) {
+		if err := os.WriteFile(projectIndex, []byte(projectIndexTemplate(projectID)), 0644); err != nil {
+			return nil, err
+		}
+	}
 
 	var dirs []string
 	for dir := parentDir; ; dir = filepath.Dir(dir) {
-		rel, err := filepath.Rel(root, dir)
+		rel, err := filepath.Rel(artifactsRoot, dir)
 		if err != nil {
 			return nil, err
 		}
 		if rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
-			return nil, fmt.Errorf("artifact path escapes %s", a.root)
+			break
 		}
 		dirs = append(dirs, dir)
-		if dir == root {
+		if dir == artifactsRoot {
 			break
 		}
 	}
@@ -161,56 +216,17 @@ func (a *ArtifactTools) ensureArtifactIndexes(parentDir string) ([]string, error
 		} else if !os.IsNotExist(err) {
 			return nil, err
 		}
-
-		content, err := a.artifactIndexContent(dir)
+		content, err := a.artifactIndexContent(projectID, dir)
 		if err != nil {
 			return nil, err
 		}
 		if err := os.WriteFile(indexPath, []byte(content), 0644); err != nil {
 			return nil, err
 		}
-		rel, _ := filepath.Rel(a.root, indexPath)
-		created = append(created, "artifacts/"+rel)
+		rel, _ := filepath.Rel(a.artifactsDir(projectID), indexPath)
+		created = append(created, projectID+"/artifacts/"+rel)
 	}
-
 	return created, nil
-}
-
-func (a *ArtifactTools) safeArtifactPath(path string) (string, error) {
-	clean := filepath.Clean(path)
-	if clean == "." || filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
-		return "", fmt.Errorf("invalid artifact path %q", path)
-	}
-	return filepath.Join(a.root, clean), nil
-}
-
-func (a *ArtifactTools) artifactIndexContent(dir string) (string, error) {
-	rel, err := filepath.Rel(a.root, dir)
-	if err != nil {
-		return "", err
-	}
-	if rel == "." {
-		return `---
-title: "Artifacts"
-weight: 10
----
-
-# Artifacts
-
-Generated workflow outputs.
-`, nil
-	}
-
-	title := titleFromSlug(filepath.Base(dir))
-	return fmt.Sprintf(`---
-title: "%s"
-weight: 10
----
-
-# %s
-
-Generated workflow outputs for %s.
-`, title, title, rel), nil
 }
 
 func titleFromSlug(slug string) string {
@@ -225,4 +241,34 @@ func titleFromSlug(slug string) string {
 		return slug
 	}
 	return strings.Join(words, " ")
+}
+
+func (a *ArtifactTools) artifactIndexContent(projectID, dir string) (string, error) {
+	artifactsRoot := a.artifactsDir(projectID)
+	rel, err := filepath.Rel(artifactsRoot, dir)
+	if err != nil {
+		return "", err
+	}
+	if rel == "." {
+		return `---
+title: "Artifacts"
+weight: 20
+bookCollapseSection: true
+---
+
+# Artifacts
+
+Generated workflow outputs.
+`, nil
+	}
+	title := titleFromSlug(filepath.Base(dir))
+	return fmt.Sprintf(`---
+title: "%s"
+weight: 10
+---
+
+# %s
+
+Generated workflow outputs for %s.
+`, title, title, rel), nil
 }

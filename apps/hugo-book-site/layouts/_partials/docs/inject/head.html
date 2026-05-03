@@ -22,11 +22,12 @@
 
   .mcp-action-menu summary {
     align-items: center;
-    border: 1px solid var(--gray-200);
+    border: 1px solid #1a6fc4;
     border-radius: 4px;
-    color: var(--body-font-color);
+    color: #1a6fc4;
     cursor: pointer;
     display: inline-flex;
+    font-weight: 700;
     height: 2rem;
     justify-content: center;
     list-style: none;
@@ -63,6 +64,7 @@
     display: block;
     font-size: 0.875rem;
     font: inherit;
+    font-weight: 600;
     padding: 0.5rem 0.65rem;
     text-decoration: none;
     text-align: left;
@@ -151,6 +153,19 @@
 
   .mcp-editor-pane {
     border-right: 1px solid var(--gray-200);
+  }
+
+  .mcp-editor-yaml .mcp-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mcp-editor-yaml .mcp-editor-pane {
+    border-right: none;
+  }
+
+  .mcp-editor-yaml textarea,
+  .mcp-editor-yaml .CodeMirror {
+    font-family: monospace;
   }
 
   .mcp-editor-pane .CodeMirror {
@@ -318,16 +333,18 @@
         button.disabled = true;
         button.textContent = "Saving";
         try {
-          const response = await fetch(window.MCP_FILE_API_BASE + "/api/files/write", {
+          const url = window.MCP_FILE_API_BASE + "/api/files/write";
+          const payload = { path: button.dataset.mcpSavePath, content: value };
+          console.log("[MCP] save →", url, payload.path, "len:", value.length);
+          const response = await fetch(url, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              path: button.dataset.mcpSavePath,
-              content: value
-            })
+            body: JSON.stringify(payload)
           });
+          const body = await response.text();
+          console.log("[MCP] save ←", response.status, body);
           if (!response.ok) {
-            throw new Error(await response.text());
+            throw new Error(body);
           }
           button.textContent = "Saved";
           window.setTimeout(function () { window.location.reload(); }, 600);

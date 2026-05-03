@@ -22,8 +22,10 @@ Nhiệm vụ:
 
 {{markdown_rules}}
 
+Nếu `{{existing_features}}` không rỗng, dùng tool **list_artifacts** để xem các artifacts hiện có, sau đó dùng **read_artifact** để đọc các discovery/spec của từng feature trong danh sách (tại `{project_id}/{feature_id_đó}/`) làm context tham khảo trước khi phân tích.
+
 Sau khi viết xong, gọi tool **write_artifact** với:
-- path = "{{project_id}}/{{feature_id}}/discovery.md"
+- path = `{project_id}/{feature_id}/{{writes}}.md` — tự xác định `project_id` và `feature_id` từ conversation context hoặc hỏi người dùng nếu chưa rõ
 - content = nội dung markdown bạn vừa viết
 
 ---
@@ -31,3 +33,5 @@ Sau khi viết xong, gọi tool **write_artifact** với:
 **User request:**
 
 {{request}}
+
+Nếu bước tiếp theo tồn tại (`{{next_step}}`), hãy gọi MCP prompt **`{{next_step}}`** để tiếp tục workflow.

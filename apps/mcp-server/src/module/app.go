@@ -1,10 +1,15 @@
 package module
 
 import (
+	"context"
+	"fmt"
+	"os"
+
 	"mcp-gateway/src/api"
 	"mcp-gateway/src/config"
 	"mcp-gateway/src/prompts"
 	"mcp-gateway/src/resources"
+	"mcp-gateway/src/scope"
 	"mcp-gateway/src/tools"
 
 	"github.com/gestgo/gest/package/extension/mcp"
@@ -33,7 +38,47 @@ func NewApp() *fx.App {
 		fx.Supply(cfg.MCP),
 		fx.Supply(cfg),
 
-		mcp.Module(),
+		fx.Provide(func(lc fx.Lifecycle, params mcp.Params) *mcpserver.MCPServer {
+			srv := mcpserver.NewMCPServer(cfg.MCP.Name, cfg.MCP.Version)
+			for _, h := range params.Handlers {
+				h.Register(srv)
+			}
+
+			switch cfg.MCP.Transport {
+			case mcp.TransportSSE:
+				sseServer := mcpserver.NewSSEServer(srv,
+					mcpserver.WithSSEContextFunc(scope.SSEContextFunc),
+					mcpserver.WithAppendQueryToMessageEndpoint(),
+				)
+				lc.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						go sseServer.Start(fmt.Sprintf(":%d", cfg.MCP.Port)) //nolint:errcheck
+						return nil
+					},
+					OnStop: func(ctx context.Context) error {
+						return sseServer.Shutdown(ctx)
+					},
+				})
+			case mcp.TransportStdio:
+				stdio := mcpserver.NewStdioServer(srv)
+				ctx, cancel := context.WithCancel(context.Background())
+				lc.Append(fx.Hook{
+					OnStart: func(context.Context) error {
+						go func() {
+							stdio.Listen(ctx, os.Stdin, os.Stdout) //nolint:errcheck
+							os.Exit(0)
+						}()
+						return nil
+					},
+					OnStop: func(context.Context) error {
+						cancel()
+						return nil
+					},
+				})
+			}
+
+			return srv
+		}),
 
 		fx.Invoke(
 			func(*mcpserver.MCPServer) {},
@@ -41,7 +86,6 @@ func NewApp() *fx.App {
 		),
 	}
 
-	// Stdio transport writes to stdout — suppress all Fx logs to avoid protocol corruption.
 	if cfg.MCP.Transport == mcp.TransportStdio {
 		opts = append([]fx.Option{fx.NopLogger}, opts...)
 	}
